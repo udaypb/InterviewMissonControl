@@ -134,6 +134,9 @@ function DashboardContent({
         tone: "border-[#4f4f4f]/45 bg-[#191919]"
       }
     ] as const;
+    const pastEventCards = dashboard.pastItems
+      .filter((item) => item.kind === "interview" || item.kind === "round")
+      .slice(0, 8);
 
     return (
       <section className="panel p-6">
@@ -214,6 +217,44 @@ function DashboardContent({
                 </div>
               );
             })}
+          </div>
+          <div className="mt-8 rounded-[30px] border border-[#87674c]/30 bg-[linear-gradient(135deg,rgba(129,95,62,0.18),rgba(17,17,17,0.88))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.22)]">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-[#d8c4a7]">Past Events</p>
+                <h3 className="mt-2 text-[1.35rem] font-semibold tracking-[-0.035em] text-text">Completed and past-touch timeline</h3>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+                  Recent interviews and rounds that already happened, pulled directly from the sheet using the current date boundary.
+                </p>
+              </div>
+              <span className="text-sm text-[#d8c4a7]">{pastEventCards.length} recent events</span>
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {pastEventCards.length === 0 ? (
+                <div className="rounded-[24px] border border-dashed border-[#9a7b58]/35 bg-black/10 p-5 text-sm text-muted md:col-span-2 xl:col-span-4">
+                  No past interviews or rounds are logged yet.
+                </div>
+              ) : null}
+              {pastEventCards.map((item) => (
+                <article key={item.id} className="rounded-[24px] border border-[#9a7b58]/30 bg-[linear-gradient(180deg,rgba(29,19,14,0.82),rgba(14,14,14,0.9))] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.22em] text-[#d8c4a7]">{item.kind}</p>
+                      <h4 className="mt-2 text-base font-medium text-text">{item.title}</h4>
+                    </div>
+                    <span className="rounded-full border border-[#9a7b58]/35 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#e3caa8]">
+                      {item.status || "logged"}
+                    </span>
+                  </div>
+                  <div className="mt-4 rounded-2xl border border-[#9a7b58]/20 bg-black/10 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Event Date</p>
+                    <p className="mt-2 text-sm font-medium text-text">{item.dateLabel}</p>
+                    <p className="mt-1 text-sm text-muted">{item.company}</p>
+                  </div>
+                  <p className="mt-4 text-sm leading-6 text-muted">{item.detail}</p>
+                </article>
+              ))}
+            </div>
           </div>
         </div>
       </section>
