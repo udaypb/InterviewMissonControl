@@ -5,7 +5,6 @@ export const dashboardConfig = {
     pipelines: "active pipelines",
     grind: "grind day"
   },
-  pollingIntervalMs: 45_000,
   cacheTtlMs: 30_000
 } as const;
 

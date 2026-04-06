@@ -11,7 +11,6 @@ import { ProgressPanel } from "@/components/ProgressPanel";
 import { StatusBar } from "@/components/StatusBar";
 import { Tabs, type DashboardTab } from "@/components/Tabs";
 import { TopStats } from "@/components/TopStats";
-import { dashboardConfig } from "@/config/dashboard";
 import type {
   DashboardPayload,
   SyncResult,
@@ -377,23 +376,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     void refreshAll();
-
-    const interval = setInterval(() => {
-      void refreshAll();
-    }, dashboardConfig.pollingIntervalMs);
-
-    const handleFocus = () => {
-      void refreshAll();
-    };
-
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleFocus);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleFocus);
-    };
   }, [refreshAll]);
 
   const syncNow = useCallback(async () => {
