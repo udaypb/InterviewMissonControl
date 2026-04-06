@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST() {
   try {
-    const payload = await getDataStore().syncFromCalendar();
+    const payload = await getDataStore().syncDashboard();
     return NextResponse.json(payload);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown sync failure";

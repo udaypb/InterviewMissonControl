@@ -113,7 +113,7 @@ function DashboardContent({
             <div className="rounded-3xl border border-dashed border-border bg-black/10 p-5">
               <p className="text-sm text-text">No interview events found.</p>
               <p className="mt-2 text-sm leading-6 text-muted">
-                Run a sync after the calendar is connected, or add rows to the `interviews` tab.
+                Add rows to the `interviews` tab or run Sync Now to refresh the dashboard from the sheet.
               </p>
             </div>
           ) : null}
@@ -194,7 +194,9 @@ function DashboardContent({
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h3 className="text-lg font-medium">{task.task}</h3>
-                  <p className="text-sm text-muted">{task.company} · {task.priority} priority · {task.status}</p>
+                  <p className="text-sm text-muted">
+                    {task.company || "General"} · {task.priority || "Unranked"} priority · {task.status || "Pending"}
+                  </p>
                 </div>
                 <div className="text-sm text-muted">{task.due_date}</div>
               </div>

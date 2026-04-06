@@ -28,9 +28,7 @@ export const envSchema = z.object({
   GOOGLE_CLIENT_EMAIL: requiredEnvString,
   GOOGLE_PRIVATE_KEY: requiredEnvString,
   GOOGLE_SHEETS_SPREADSHEET_ID: requiredEnvString,
-  GOOGLE_CALENDAR_ID: stringField.default("primary"),
   GOOGLE_DRIVE_PROJECT_FOLDER_ID: stringField.optional(),
-  GOOGLE_CALENDAR_IMPERSONATE_USER: stringField.optional(),
   NEXT_PUBLIC_APP_NAME: stringField.optional()
 });
 
@@ -44,6 +42,7 @@ export const interviewRowSchema = z.object({
   end_time: stringField,
   round_type: stringField,
   status: stringField,
+  priority: stringField,
   interviewer: stringField,
   meeting_link: stringField,
   notes: stringField,
@@ -171,26 +170,16 @@ export function getConfigurationHealth() {
     return {
       healthy: false,
       label: "Config missing",
-      message: "Google credentials are incomplete.",
-      detail: "Set GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY, GOOGLE_SHEETS_SPREADSHEET_ID, and GOOGLE_CALENDAR_ID."
-    };
-  }
-
-  const env = parsed.data;
-  if (env.GOOGLE_CALENDAR_ID === "primary" && !env.GOOGLE_CALENDAR_IMPERSONATE_USER) {
-    return {
-      healthy: true,
-      label: "Sync limited",
-      message: "Sheets are live, but primary calendar sync needs impersonation.",
-      detail: "Use a shared calendar ID or configure GOOGLE_CALENDAR_IMPERSONATE_USER with Workspace domain-wide delegation."
+      message: "Google Sheets credentials are incomplete.",
+      detail: "Set GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY, and GOOGLE_SHEETS_SPREADSHEET_ID."
     };
   }
 
   return {
     healthy: true,
     label: "Config healthy",
-    message: "Sheets and Calendar configuration look valid.",
-    detail: "API routes can read Sheets and reconcile Calendar events."
+    message: "Google Sheets configuration looks valid.",
+    detail: "API routes can read Sheets and rebuild dashboard state from the spreadsheet."
   };
 }
 

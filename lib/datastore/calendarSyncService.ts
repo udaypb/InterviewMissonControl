@@ -22,6 +22,15 @@ function getManualNotes(existingMatches: InterviewRow[]) {
     .find((notes) => notes.length > 0) || "";
 }
 
+function getManualPriority(existingMatches: InterviewRow[], companyPriority: string) {
+  return (
+    existingMatches
+      .map((row) => row.priority.trim())
+      .find((priority) => priority.length > 0) ||
+    companyPriority
+  );
+}
+
 function inferCompany(summary: string, companies: CompanyRow[]): string {
   const normalized = summary.toLowerCase();
   const matchedCompany = companies.find((company) =>
@@ -103,12 +112,15 @@ function normalizeEvent(
   const summary = event.summary || "Interview";
   const description = event.description || "";
   const existing = existingById.get(event.id);
+  const company = inferCompany(summary, companies);
+  const companyPriority =
+    companies.find((candidate) => candidate.company === company)?.priority || "";
   const date = event.start?.dateTime ? isoDateFromDateTime(event.start.dateTime) : event.start?.date || "";
   const startTime = event.start?.dateTime ? formatTimeLabel(event.start.dateTime) : "";
   const endTime = event.end?.dateTime ? formatTimeLabel(event.end.dateTime) : "";
 
   return {
-    company: inferCompany(summary, companies),
+    company,
     role: existing?.role || titleCase(summary.split("-").slice(1).join(" ").trim() || "Interview Loop"),
     event_id: event.id,
     calendar_source: calendarSource,
@@ -117,6 +129,7 @@ function normalizeEvent(
     end_time: endTime,
     round_type: existing?.round_type || inferRoundType(summary, description),
     status: inferStatus(event),
+    priority: existing?.priority || companyPriority,
     interviewer: extractInterviewer(event) || existing?.interviewer || "",
     meeting_link: extractMeetingLink(event) || existing?.meeting_link || "",
     notes: existing?.notes || "",
@@ -154,6 +167,7 @@ export class CalendarSyncService {
         ...existingByKey.get(fingerprint),
         ...existingById.get(row.event_id),
         ...row,
+        priority: getManualPriority(noteCandidates, row.priority),
         notes: getManualNotes(noteCandidates) || row.notes
       });
     }

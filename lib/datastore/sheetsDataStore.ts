@@ -4,7 +4,6 @@ import type {
   ConfigStatus,
   DashboardPayload,
   DataStore,
-  InterviewRow,
   InterviewsPayload,
   SkillsPayload,
   StorageSnapshot,
@@ -12,9 +11,8 @@ import type {
   TasksPayload
 } from "@/lib/datastore/types";
 import { assembleDashboardPayload, buildSummaryRows } from "@/lib/datastore/dashboardAssembler";
-import { CalendarSyncService } from "@/lib/datastore/calendarSyncService";
 import { ensureDriveWorkspaceStructure, getDriveWorkspaceStatus } from "@/lib/google/drive";
-import { appendSyncLogRow, ensureSpreadsheetStructure, readSheet, writeDashboardSummaryRows, writeSheet } from "@/lib/google/sheets";
+import { appendSyncLogRow, ensureSpreadsheetStructure, readSheet, writeDashboardSummaryRows } from "@/lib/google/sheets";
 import { getOrSetCache, invalidateCache } from "@/lib/utils/cache";
 import { logError } from "@/lib/utils/logging";
 import {
@@ -33,39 +31,6 @@ import {
   getConfigurationHealth
 } from "@/lib/utils/validation";
 
-function buildInterviewIdentity(row: InterviewRow) {
-  const fingerprint = [
-    row.company.trim().toLowerCase(),
-    row.date.trim(),
-    row.start_time.trim().toLowerCase(),
-    row.round_type.trim().toLowerCase(),
-    row.interviewer.trim().toLowerCase()
-  ].join("|");
-
-  const hasMeaningfulFingerprint = fingerprint.replace(/\|/g, "").length > 0;
-  return hasMeaningfulFingerprint ? fingerprint : row.event_id;
-}
-
-function mergeInterviewRows(base: InterviewRow | undefined, next: InterviewRow) {
-  return {
-    ...base,
-    ...next,
-    notes: base?.notes?.trim() || next.notes,
-    role: base?.role?.trim() || next.role
-  };
-}
-
-function dedupeInterviews(rows: InterviewRow[]) {
-  const deduped = new Map<string, InterviewRow>();
-
-  for (const row of rows) {
-    const key = buildInterviewIdentity(row);
-    deduped.set(key, mergeInterviewRows(deduped.get(key), row));
-  }
-
-  return [...deduped.values()].sort((left, right) => left.date.localeCompare(right.date));
-}
-
 export function buildFallbackDashboardPayload(message: string): DashboardPayload {
   const configStatus = getConfigurationHealth();
   return {
@@ -78,12 +43,12 @@ export function buildFallbackDashboardPayload(message: string): DashboardPayload
       {
         label: "Next Interview",
         value: "Sync required",
-        detail: "Connect Sheets and Calendar to hydrate this board."
+        detail: "Connect Google Sheets to hydrate this board."
       },
       {
         label: "This Week",
         value: "0 loops",
-        detail: "No upcoming interview events available."
+        detail: "No upcoming interview rows available."
       },
       {
         label: "Urgent Item",
@@ -106,7 +71,7 @@ export function buildFallbackDashboardPayload(message: string): DashboardPayload
       {
         variant: "yellow",
         title: "Next Move",
-        body: "Finish configuration, then run Sync Now to seed interviews and summary rows."
+        body: "Finish configuration, then run Sync Now to rebuild summary rows from the spreadsheet."
       }
     ],
     companyIntel: [],
@@ -201,8 +166,6 @@ async function readSnapshot(): Promise<StorageSnapshot> {
 }
 
 export class SheetsDataStore implements DataStore {
-  private calendarSyncService = new CalendarSyncService();
-
   async getDashboardSummary(): Promise<DashboardPayload> {
     return getOrSetCache("dashboard-summary", dashboardConfig.cacheTtlMs, async () => {
       const snapshot = await readSnapshot();
@@ -257,39 +220,22 @@ export class SheetsDataStore implements DataStore {
     });
   }
 
-  async syncFromCalendar(): Promise<SyncResult> {
+  async syncDashboard(): Promise<SyncResult> {
     try {
       await ensureDriveWorkspaceStructure().catch(() => undefined);
       const snapshot = await readSnapshot();
-      const syncedInterviewRows = await this.calendarSyncService.syncInterviewEvents(
-        snapshot.interviews,
-        snapshot.companies,
-        process.env.GOOGLE_CALENDAR_ID || "primary"
-      );
-
-      const mergedInterviews = dedupeInterviews([
-        ...snapshot.interviews,
-        ...syncedInterviewRows
-      ]);
-
-      await writeSheet("interviews", mergedInterviews);
-
-      const nextSnapshot: StorageSnapshot = {
-        ...snapshot,
-        interviews: mergedInterviews
-      };
-      const dashboard = assembleDashboardPayload(nextSnapshot, await getSystemConfigurationStatus());
+      const dashboard = assembleDashboardPayload(snapshot, await getSystemConfigurationStatus());
       const syncedAt = new Date().toISOString();
       dashboard.lastSyncedAt = syncedAt;
       dashboard.lastSyncStatus = "success";
-      dashboard.syncMessage = `${syncedInterviewRows.length} calendar events reconciled.`;
+      dashboard.syncMessage = "Dashboard summary refreshed from Google Sheets.";
 
       await writeDashboardSummaryRows(buildSummaryRows(dashboard));
       await appendSyncLogRow({
         timestamp: syncedAt,
-        sync_type: "calendar_pull",
+        sync_type: "sheet_refresh",
         status: "success",
-        details: `${syncedInterviewRows.length} interview events upserted from Google Calendar.`
+        details: "Dashboard summary refreshed from spreadsheet data."
       });
 
       invalidateCache();
@@ -297,18 +243,18 @@ export class SheetsDataStore implements DataStore {
       return {
         status: "success",
         message: dashboard.syncMessage,
-        syncedCount: syncedInterviewRows.length,
+        syncedCount: snapshot.interviews.length,
         lastSyncedAt: syncedAt,
         dashboard
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown sync failure";
-      logError("Calendar sync failed", { message });
+      logError("Dashboard sheet refresh failed", { message });
       const fallback = await this.getDashboardSummary().catch(() => buildFallbackDashboardPayload(message));
 
       await appendSyncLogRow({
         timestamp: new Date().toISOString(),
-        sync_type: "calendar_pull",
+        sync_type: "sheet_refresh",
         status: "error",
         details: message
       }).catch(() => undefined);

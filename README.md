@@ -1,6 +1,6 @@
 # Interview Mission Control Dashboard
 
-Interview Mission Control is a Vercel-ready Next.js dashboard backed by Google Sheets, Google Calendar, and a linked Google Drive workspace. Google Drive holds raw working-memory context for ChatGPT, Google Sheets remains the canonical structured store for rendering, and the frontend consumes only internal API routes.
+Interview Mission Control is a Vercel-ready Next.js dashboard backed by Google Sheets and a linked Google Drive workspace. Google Drive holds raw working-memory context for ChatGPT, Google Sheets remains the canonical structured store for rendering, and the frontend consumes only internal API routes.
 
 ## Stack
 
@@ -8,7 +8,6 @@ Interview Mission Control is a Vercel-ready Next.js dashboard backed by Google S
 - React
 - Tailwind CSS
 - Google Sheets API
-- Google Calendar API
 - Google Drive API
 - Zod validation
 
@@ -19,11 +18,9 @@ Google Drive workspace
     ↓
 ChatGPT / manual calibration
     ↓
-Google Calendar
+Google Sheets
     ↓
 Sync layer
-    ↓
-Google Sheets
     ↓
 Next.js API routes
     ↓
@@ -49,7 +46,6 @@ Dashboard frontend
    - `GOOGLE_CLIENT_EMAIL`
    - `GOOGLE_PRIVATE_KEY`
    - `GOOGLE_SHEETS_SPREADSHEET_ID`
-   - `GOOGLE_CALENDAR_ID`
    - `GOOGLE_DRIVE_PROJECT_FOLDER_ID`
    - `NEXT_PUBLIC_APP_NAME`
 
@@ -101,13 +97,11 @@ The final design uses a dedicated Google Drive folder as raw context for ChatGPT
 
 `POST /api/sync`:
 
-1. Reads upcoming Google Calendar events.
-2. Detects likely interview events.
-3. Upserts interview rows into the `interviews` sheet.
-4. Preserves user-entered notes when possible.
-5. Ensures the Drive working-memory folder contract exists when access allows.
-6. Recomputes compact summary rows.
-7. Appends a `sync_log` entry.
+1. Reads the current spreadsheet state.
+2. Treats the `interviews` tab as the source of truth for upcoming interviews and meetings.
+3. Ensures the Drive working-memory folder contract exists when access allows.
+4. Recomputes compact summary rows.
+5. Appends a `sync_log` entry.
 
 The dashboard polls every 45 seconds and refreshes on window focus.
 
@@ -115,9 +109,8 @@ The dashboard polls every 45 seconds and refreshes on window focus.
 
 - This project is built to run on Vercel.
 - Service-account auth is used for Google Sheets.
-- Calendar access works with a shared calendar or domain-wide delegation.
 - Drive workspace validation uses the same service account.
-- If `GOOGLE_CALENDAR_ID=primary`, set `GOOGLE_CALENDAR_IMPERSONATE_USER`.
+- Interview scheduling data is read from the `interviews` sheet only.
 
 See:
 

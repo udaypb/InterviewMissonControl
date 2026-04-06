@@ -21,6 +21,7 @@ export interface InterviewRow {
   end_time: string;
   round_type: string;
   status: string;
+  priority: string;
   interviewer: string;
   meeting_link: string;
   notes: string;
@@ -270,5 +271,5 @@ export interface DataStore {
   getTasks(): Promise<TasksPayload>;
   getCompanies(): Promise<CompaniesPayload>;
   getSkills(): Promise<SkillsPayload>;
-  syncFromCalendar(): Promise<SyncResult>;
+  syncDashboard(): Promise<SyncResult>;
 }
