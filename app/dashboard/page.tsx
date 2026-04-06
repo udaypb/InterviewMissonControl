@@ -13,12 +13,8 @@ import { Tabs, type DashboardTab } from "@/components/Tabs";
 import { TopStats } from "@/components/TopStats";
 import { dashboardConfig } from "@/config/dashboard";
 import type {
-  CompaniesPayload,
   DashboardPayload,
-  InterviewsPayload,
-  SkillsPayload,
   SyncResult,
-  TasksPayload
 } from "@/lib/datastore/types";
 
 const emptyDashboard: DashboardPayload = {
@@ -58,26 +54,12 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function fetchOptionalJson<T>(url: string): Promise<T | null> {
-  try {
-    return await fetchJson<T>(url);
-  } catch {
-    return null;
-  }
-}
-
 function DashboardContent({
   dashboard,
-  interviews,
-  tasks,
-  skills,
   activeTab,
   onOpenSkillMap
 }: {
   dashboard: DashboardPayload;
-  interviews: InterviewsPayload | null;
-  tasks: TasksPayload | null;
-  skills: SkillsPayload | null;
   activeTab: DashboardTab;
   onOpenSkillMap: () => void;
 }) {
@@ -104,7 +86,7 @@ function DashboardContent({
   }
 
   if (activeTab === "Interview Calendar") {
-    const calendarItems = interviews?.interviews || dashboard.interviewCalendar;
+    const calendarItems = dashboard.interviewCalendar;
     return (
       <section className="panel p-6">
         <p className="text-xs uppercase tracking-[0.24em] text-muted">Interview Calendar</p>
@@ -134,13 +116,13 @@ function DashboardContent({
   }
 
   if (activeTab === "Skill Map") {
-    const items = skills?.skills || dashboard.skillMap;
+    const items = dashboard.skillMap;
     return (
       <section className="panel p-6">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-muted">Skill Map</p>
-            <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em]">Weakest area: {skills?.weakestArea || dashboard.weakestArea}</h2>
+            <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em]">Weakest area: {dashboard.weakestArea}</h2>
           </div>
         </div>
         <div className="mt-6 space-y-5">
@@ -173,9 +155,7 @@ function DashboardContent({
   }
 
   if (activeTab === "Coding Tracker") {
-    const codingItems = tasks?.tasks.filter((task) =>
-      ["coding", "technical", "algorithm"].some((keyword) => task.category.toLowerCase().includes(keyword))
-    ) || dashboard.codingTracker;
+    const codingItems = dashboard.codingTracker;
 
     return (
       <section className="panel p-6">
@@ -233,10 +213,6 @@ function DashboardContent({
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<DashboardTab>("Dashboard");
   const [dashboard, setDashboard] = useState<DashboardPayload>(emptyDashboard);
-  const [interviews, setInterviews] = useState<InterviewsPayload | null>(null);
-  const [tasks, setTasks] = useState<TasksPayload | null>(null);
-  const [companies, setCompanies] = useState<CompaniesPayload | null>(null);
-  const [skills, setSkills] = useState<SkillsPayload | null>(null);
   const [error, setError] = useState<string>("");
   const [warning, setWarning] = useState<string>("");
   const [isSyncing, setIsSyncing] = useState(false);
@@ -245,29 +221,11 @@ export default function DashboardPage() {
   const refreshAll = useCallback(async () => {
     try {
       const dashboardPayload = await fetchJson<DashboardPayload>("/api/dashboard-summary");
-      const [interviewsPayload, tasksPayload, companiesPayload, skillsPayload] = await Promise.all([
-        fetchOptionalJson<InterviewsPayload>("/api/interviews"),
-        fetchOptionalJson<TasksPayload>("/api/tasks"),
-        fetchOptionalJson<CompaniesPayload>("/api/companies"),
-        fetchOptionalJson<SkillsPayload>("/api/skills")
-      ]);
-
-      const partialFailure = [interviewsPayload, tasksPayload, companiesPayload, skillsPayload].some(
-        (payload) => payload === null
-      );
 
       startTransition(() => {
         setDashboard(dashboardPayload);
-        setInterviews(interviewsPayload);
-        setTasks(tasksPayload);
-        setCompanies(companiesPayload);
-        setSkills(skillsPayload);
         setError("");
-        setWarning(
-          partialFailure
-            ? "Some secondary panels could not refresh. The summary view is still current."
-            : ""
-        );
+        setWarning("");
       });
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Failed to load dashboard data.");
@@ -299,16 +257,17 @@ export default function DashboardPage() {
     setIsSyncing(true);
     try {
       const result = await fetchJson<SyncResult>("/api/sync", { method: "POST" });
-      if (result.status === "error") {
-        setWarning(result.message);
-      }
-      await refreshAll();
+      startTransition(() => {
+        setDashboard(result.dashboard);
+        setError("");
+        setWarning(result.status === "error" ? result.message : "");
+      });
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Sync failed.");
     } finally {
       setIsSyncing(false);
     }
-  }, [refreshAll]);
+  }, [startTransition]);
 
   const subtitle = useMemo(() => dashboard.configStatus.message, [dashboard.configStatus.message]);
   const lastUpdated = useMemo(
@@ -345,14 +304,7 @@ export default function DashboardPage() {
         </section>
       ) : (
         <DashboardContent
-          dashboard={{
-            ...dashboard,
-            companyIntel: companies?.companies || dashboard.companyIntel,
-            skillMap: skills?.skills || dashboard.skillMap
-          }}
-          interviews={interviews}
-          tasks={tasks}
-          skills={skills}
+          dashboard={dashboard}
           activeTab={activeTab}
           onOpenSkillMap={() => setActiveTab("Skill Map")}
         />
