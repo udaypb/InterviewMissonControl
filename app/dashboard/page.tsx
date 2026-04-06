@@ -42,6 +42,31 @@ const emptyDashboard: DashboardPayload = {
   }
 };
 
+function getSyncTimestamp(value: string) {
+  if (!value || value === "Never") {
+    return 0;
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function mergeDashboardState(current: DashboardPayload, next: DashboardPayload): DashboardPayload {
+  const currentSyncTs = getSyncTimestamp(current.lastSyncedAt);
+  const nextSyncTs = getSyncTimestamp(next.lastSyncedAt);
+
+  if (nextSyncTs >= currentSyncTs) {
+    return next;
+  }
+
+  return {
+    ...next,
+    lastSyncedAt: current.lastSyncedAt,
+    lastSyncStatus: current.lastSyncStatus,
+    syncMessage: current.syncMessage
+  };
+}
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     cache: "no-store",
@@ -223,7 +248,7 @@ export default function DashboardPage() {
       const dashboardPayload = await fetchJson<DashboardPayload>("/api/dashboard-summary");
 
       startTransition(() => {
-        setDashboard(dashboardPayload);
+        setDashboard((current) => mergeDashboardState(current, dashboardPayload));
         setError("");
         setWarning("");
       });
@@ -258,7 +283,7 @@ export default function DashboardPage() {
     try {
       const result = await fetchJson<SyncResult>("/api/sync", { method: "POST" });
       startTransition(() => {
-        setDashboard(result.dashboard);
+        setDashboard((current) => mergeDashboardState(current, result.dashboard));
         setError("");
         setWarning(result.status === "error" ? result.message : "");
       });
