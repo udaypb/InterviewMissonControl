@@ -1,15 +1,27 @@
 import { NextResponse } from "next/server";
 
 import { getDataStore } from "@/lib/datastore/sheetsDataStore";
+import { hasRequiredGoogleConfig } from "@/lib/utils/validation";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  if (!hasRequiredGoogleConfig()) {
+    return NextResponse.json({
+      skills: [],
+      skillGaps: [],
+      weakestArea: "Unknown"
+    });
+  }
+
   try {
     const payload = await getDataStore().getSkills();
     return NextResponse.json(payload);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown skills failure";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.json({
+      skills: [],
+      skillGaps: [],
+      weakestArea: "Unknown"
+    });
   }
 }

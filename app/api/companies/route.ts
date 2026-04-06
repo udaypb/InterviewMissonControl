@@ -1,15 +1,25 @@
 import { NextResponse } from "next/server";
 
 import { getDataStore } from "@/lib/datastore/sheetsDataStore";
+import { hasRequiredGoogleConfig } from "@/lib/utils/validation";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  if (!hasRequiredGoogleConfig()) {
+    return NextResponse.json({
+      companies: [],
+      recruiterNotes: []
+    });
+  }
+
   try {
     const payload = await getDataStore().getCompanies();
     return NextResponse.json(payload);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown companies failure";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.json({
+      companies: [],
+      recruiterNotes: []
+    });
   }
 }
