@@ -14,18 +14,17 @@
 `POST /api/sync`
 
 1. Read the current spreadsheet tabs.
-2. Treat the `interviews` tab as the source of truth for upcoming interviews and meeting schedules.
-3. Ensure the Drive working-memory folder structure exists when access allows.
-4. Recompute dashboard summary values.
-5. Write summary rows to `dashboard_summary`.
-6. Append a log entry to `sync_log`.
+2. Ensure the Drive working-memory folder structure exists when access allows.
+3. Recompute dashboard summary values from Sheet data.
+4. Write summary rows to `dashboard_summary`.
+5. Append a log entry to `sync_log`.
 
 ## Failure Handling
 
 - Missing env vars returns a clean API error and the dashboard shows a fallback message.
 - Missing sheets or malformed rows degrade to empty sections rather than crashing the page.
 - Missing Drive workspace linkage does not block dashboard rendering; it is surfaced as config attention.
-- Sheet refresh failures are recorded in `sync_log`.
+- Sheets refresh failures are recorded in `sync_log`.
 
 ## Manual Recovery
 

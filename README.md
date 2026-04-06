@@ -1,6 +1,6 @@
 # Interview Mission Control Dashboard
 
-Interview Mission Control is a Vercel-ready Next.js dashboard backed by Google Sheets and a linked Google Drive workspace. Google Drive holds raw working-memory context for ChatGPT, Google Sheets remains the canonical structured store for rendering, and the frontend consumes only internal API routes.
+Interview Mission Control is a Vercel-ready Next.js dashboard backed by Google Sheets and a linked Google Drive workspace. Google Drive holds raw working-memory context for ChatGPT, Google Sheets is the canonical structured store for rendering, and the frontend consumes only internal API routes.
 
 ## Stack
 
@@ -19,8 +19,6 @@ Google Drive workspace
 ChatGPT / manual calibration
     ↓
 Google Sheets
-    ↓
-Sync layer
     ↓
 Next.js API routes
     ↓
@@ -71,7 +69,7 @@ Dashboard frontend
 - `dashboard_summary`
 - `sync_log`
 
-The app bootstraps missing tabs, headers, and sample rows when it first connects.
+The app creates any missing tabs and initializes headers for empty tabs without rewriting non-empty source tabs.
 
 ## Working-Memory Drive Folder
 
@@ -97,11 +95,10 @@ The final design uses a dedicated Google Drive folder as raw context for ChatGPT
 
 `POST /api/sync`:
 
-1. Reads the current spreadsheet state.
-2. Treats the `interviews` tab as the source of truth for upcoming interviews and meetings.
+1. Reads the current spreadsheet tabs.
+2. Recomputes compact summary rows from Sheet data.
 3. Ensures the Drive working-memory folder contract exists when access allows.
-4. Recomputes compact summary rows.
-5. Appends a `sync_log` entry.
+4. Appends a `sync_log` entry.
 
 The dashboard polls every 45 seconds and refreshes on window focus.
 
@@ -110,7 +107,6 @@ The dashboard polls every 45 seconds and refreshes on window focus.
 - This project is built to run on Vercel.
 - Service-account auth is used for Google Sheets.
 - Drive workspace validation uses the same service account.
-- Interview scheduling data is read from the `interviews` sheet only.
 
 See:
 

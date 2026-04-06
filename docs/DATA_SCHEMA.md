@@ -20,17 +20,17 @@ Required tabs:
 
 ## Source of Truth
 
-- Google Sheets is the source of truth for scheduled interview events, dashboard state, tasks, company notes, skills, and derived summary rows.
+- Google Sheets is the source of truth for interview events, dashboard state, tasks, company notes, skills, and derived summary rows.
 - Google Drive is the working-memory source for raw brain dumps, backups, drafts, and evolving context that ChatGPT can review before updating Sheets.
 - The frontend consumes only internal API routes. It never reads Google APIs directly.
 
 ## Key Behaviors
 
 - Missing tabs are added automatically.
-- Missing or incorrect headers are normalized automatically.
-- Empty tabs are bootstrapped with realistic sample rows.
-- The `interviews` tab is read directly for upcoming interviews and meeting schedules.
-- Sync refreshes derived summary state from Sheets and logs the refresh in `sync_log`.
+- Missing tabs are created automatically.
+- Empty tabs can be initialized with default headers.
+- Non-empty source tabs keep their existing headers, and the app maps lean sheet schemas into the internal dashboard model at read time.
+- Dashboard refresh recomputes summary rows directly from the current Sheet state.
 - The dashboard never renders directly from Drive files.
 - Drive context is intended for LLM/manual workflows that calibrate Sheets on command.
 

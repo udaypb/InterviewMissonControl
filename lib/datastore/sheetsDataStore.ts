@@ -1,13 +1,16 @@
 import { dashboardConfig } from "@/config/dashboard";
 import type {
+  CompanyRow,
   CompaniesPayload,
   ConfigStatus,
   DashboardPayload,
   DataStore,
+  InterviewRow,
   InterviewsPayload,
   SkillsPayload,
   StorageSnapshot,
   SyncResult,
+  TaskRow,
   TasksPayload
 } from "@/lib/datastore/types";
 import { assembleDashboardPayload, buildSummaryRows } from "@/lib/datastore/dashboardAssembler";
@@ -31,6 +34,56 @@ import {
   getConfigurationHealth
 } from "@/lib/utils/validation";
 
+function inferCompanyFromTaskTitle(title: string) {
+  const stopWords = new Set([
+    "prep",
+    "prepare",
+    "complete",
+    "finish",
+    "review",
+    "practice",
+    "submit",
+    "send",
+    "draft",
+    "refresh",
+    "rehearse",
+    "follow",
+    "up",
+    "with",
+    "for"
+  ]);
+
+  const tokens = title.match(/[A-Za-z0-9+.#-]+/g) ?? [];
+  const companyTokens = tokens.filter((token) => {
+    const normalized = token.toLowerCase();
+    return !stopWords.has(normalized) && /^[A-Z]/.test(token);
+  });
+
+  return companyTokens[0] || "";
+}
+
+function enrichTasks(tasks: TaskRow[], companies: CompanyRow[], interviews: InterviewRow[]) {
+  const knownCompanies = [...new Set([
+    ...companies.map((company) => company.company).filter(Boolean),
+    ...interviews.map((interview) => interview.company).filter(Boolean)
+  ])];
+
+  return tasks.map((task) => {
+    if (task.company.trim()) {
+      return task;
+    }
+
+    const matchedCompany = knownCompanies.find((company) =>
+      task.task.toLowerCase().includes(company.toLowerCase())
+    );
+
+    return {
+      ...task,
+      company: matchedCompany || inferCompanyFromTaskTitle(task.task)
+    };
+  });
+}
+
 export function buildFallbackDashboardPayload(message: string): DashboardPayload {
   const configStatus = getConfigurationHealth();
   return {
@@ -43,12 +96,12 @@ export function buildFallbackDashboardPayload(message: string): DashboardPayload
       {
         label: "Next Interview",
         value: "Sync required",
-        detail: "Connect Google Sheets to hydrate this board."
+        detail: "Connect Google Sheets and populate the interviews tab to hydrate this board."
       },
       {
         label: "This Week",
         value: "0 loops",
-        detail: "No upcoming interview rows available."
+        detail: "No upcoming interview events available."
       },
       {
         label: "Urgent Item",
@@ -71,7 +124,7 @@ export function buildFallbackDashboardPayload(message: string): DashboardPayload
       {
         variant: "yellow",
         title: "Next Move",
-        body: "Finish configuration, then run Sync Now to rebuild summary rows from the spreadsheet."
+        body: "Finish configuration, then run Sync Now to seed interviews and summary rows."
       }
     ],
     companyIntel: [],
@@ -150,12 +203,16 @@ async function readSnapshot(): Promise<StorageSnapshot> {
     readSheet("sync_log")
   ]);
 
+  const parsedInterviews = parseRows(interviews, interviewRowSchema);
+  const parsedCompanies = parseRows(companies, companyRowSchema);
+  const parsedTasks = enrichTasks(parseRows(tasks, taskRowSchema), parsedCompanies, parsedInterviews);
+
   return {
-    interviews: parseRows(interviews, interviewRowSchema),
+    interviews: parsedInterviews,
     rounds: parseRows(rounds, roundRowSchema),
-    tasks: parseRows(tasks, taskRowSchema),
+    tasks: parsedTasks,
     dailyPlan: parseRows(dailyPlan, dailyPlanRowSchema),
-    companies: parseRows(companies, companyRowSchema),
+    companies: parsedCompanies,
     recruiterNotes: parseRows(recruiterNotes, recruiterNoteRowSchema),
     skills: parseRows(skills, skillRowSchema),
     skillGaps: parseRows(skillGaps, skillGapRowSchema),
@@ -228,14 +285,14 @@ export class SheetsDataStore implements DataStore {
       const syncedAt = new Date().toISOString();
       dashboard.lastSyncedAt = syncedAt;
       dashboard.lastSyncStatus = "success";
-      dashboard.syncMessage = "Dashboard summary refreshed from Google Sheets.";
+      dashboard.syncMessage = `Dashboard refreshed from Google Sheets. ${snapshot.interviews.length} interview rows available.`;
 
       await writeDashboardSummaryRows(buildSummaryRows(dashboard));
       await appendSyncLogRow({
         timestamp: syncedAt,
-        sync_type: "sheet_refresh",
+        sync_type: "sheets_refresh",
         status: "success",
-        details: "Dashboard summary refreshed from spreadsheet data."
+        details: `Dashboard summary rebuilt from Google Sheets. ${snapshot.interviews.length} interview rows read.`
       });
 
       invalidateCache();
@@ -249,12 +306,12 @@ export class SheetsDataStore implements DataStore {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown sync failure";
-      logError("Dashboard sheet refresh failed", { message });
+      logError("Sheets refresh failed", { message });
       const fallback = await this.getDashboardSummary().catch(() => buildFallbackDashboardPayload(message));
 
       await appendSyncLogRow({
         timestamp: new Date().toISOString(),
-        sync_type: "sheet_refresh",
+        sync_type: "sheets_refresh",
         status: "error",
         details: message
       }).catch(() => undefined);

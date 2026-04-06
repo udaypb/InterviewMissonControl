@@ -20,7 +20,7 @@ export function BattlePlan({ items }: BattlePlanProps) {
           <div className="rounded-3xl border border-dashed border-border bg-black/10 p-5">
             <p className="text-sm text-text">No battle plan yet.</p>
             <p className="mt-2 text-sm leading-6 text-muted">
-              Add rows in `daily_plan` or run a sync so the dashboard can derive the next sequence.
+              Add rows in `daily_plan` or refresh the dashboard so it can derive the next sequence.
             </p>
           </div>
         ) : null}

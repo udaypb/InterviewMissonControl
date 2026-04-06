@@ -42,7 +42,6 @@ export const interviewRowSchema = z.object({
   end_time: stringField,
   round_type: stringField,
   status: stringField,
-  priority: stringField,
   interviewer: stringField,
   meeting_link: stringField,
   notes: stringField,
@@ -170,7 +169,7 @@ export function getConfigurationHealth() {
     return {
       healthy: false,
       label: "Config missing",
-      message: "Google Sheets credentials are incomplete.",
+      message: "Google credentials are incomplete.",
       detail: "Set GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY, and GOOGLE_SHEETS_SPREADSHEET_ID."
     };
   }
@@ -179,7 +178,7 @@ export function getConfigurationHealth() {
     healthy: true,
     label: "Config healthy",
     message: "Google Sheets configuration looks valid.",
-    detail: "API routes can read Sheets and rebuild dashboard state from the spreadsheet."
+    detail: "API routes can read Sheets and build the dashboard from spreadsheet data."
   };
 }
 

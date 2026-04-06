@@ -1,133 +1,176 @@
 import { google, sheets_v4 } from "googleapis";
 
-import { sheetDefinitions, sheetSamples, spreadsheetTitle } from "@/config/sheets";
+import { sheetDefinitions, spreadsheetTitle } from "@/config/sheets";
 import type { DashboardSummaryRow, SheetName, SyncLogRow } from "@/lib/datastore/types";
 import { getSheetsAuth } from "@/lib/google/auth";
 import { logInfo, logWarn } from "@/lib/utils/logging";
-
-const sheetHeaderAliases: Partial<Record<SheetName, Partial<Record<string, string[]>>>> = {
-  interviews: {
-    round_type: ["round type", "stage", "type"],
-    start_time: ["start time", "time"],
-    end_time: ["end time"],
-    event_id: ["event id", "calendar_event_id"],
-    calendar_source: ["calendar source"],
-    meeting_link: ["meeting link", "link"],
-    last_synced_at: ["last synced at", "synced at"],
-    priority: ["importance"]
-  },
-  tasks: {
-    task_id: ["task id", "id"],
-    due_date: ["due date", "date"],
-    estimated_minutes: ["estimated minutes", "minutes", "duration"],
-    last_updated: ["last updated"]
-  },
-  daily_plan: {
-    task_id: ["task id"],
-    focus_area: ["focus area"],
-    priority: ["importance"]
-  },
-  companies: {
-    h1b_sponsorship: ["h1b sponsorship", "sponsorship"],
-    salary_band: ["salary band", "compensation"],
-    target_level: ["target level", "level"],
-    next_step: ["next step"],
-    status: ["stage"]
-  },
-  recruiter_notes: {
-    recruiter_name: ["recruiter", "recruiter name"],
-    last_contact_date: ["last contact date"],
-    next_step: ["next step"]
-  },
-  skills: {
-    progress_percent: ["progress percent", "progress"],
-    target_percent: ["target percent", "target"],
-    last_updated: ["last updated"]
-  },
-  skill_gaps: {
-    gap_score: ["gap score"]
-  },
-  behavioral_stories: {
-    story_id: ["story id"],
-    company_fit: ["company fit"],
-    strength_score: ["strength score"]
-  },
-  dashboard_summary: {
-    last_updated: ["last updated"]
-  },
-  sync_log: {
-    sync_type: ["sync type"]
-  }
-};
-
-function normalizeHeader(value: string) {
-  return value.trim().toLowerCase().replace(/[\s-]+/g, "_");
-}
 
 function toA1Range(sheetName: string) {
   return `${sheetName}!A:Z`;
 }
 
-function columnNumberToLetter(column: number) {
-  let value = column;
-  let letters = "";
-
-  while (value > 0) {
-    const remainder = (value - 1) % 26;
-    letters = String.fromCharCode(65 + remainder) + letters;
-    value = Math.floor((value - 1) / 26);
-  }
-
-  return letters || "A";
-}
-
-function rowToArray<T extends object>(row: T, headers: readonly string[]) {
-  const record = row as Record<string, string>;
-  return headers.map((header) => record[header] ?? "");
-}
-
-function getCanonicalHeaders(sheetName: SheetName) {
-  return [...sheetDefinitions[sheetName]];
-}
-
-function getHeaderLookup(sheetName: SheetName, actualHeaders: string[]) {
-  const normalizedActual = new Map(
-    actualHeaders.map((header, index) => [normalizeHeader(header), index])
-  );
-  const aliases = sheetHeaderAliases[sheetName] ?? {};
-  const lookup = new Map<string, number>();
-
-  for (const canonicalHeader of getCanonicalHeaders(sheetName)) {
-    const candidates = [canonicalHeader, ...(aliases[canonicalHeader] ?? [])];
-    const matchedIndex = candidates
-      .map((candidate) => normalizedActual.get(normalizeHeader(candidate)))
-      .find((index): index is number => typeof index === "number");
-
-    if (typeof matchedIndex === "number") {
-      lookup.set(canonicalHeader, matchedIndex);
-    }
-  }
-
-  return lookup;
+function rowToArray<T extends Record<string, string>>(
+  row: T,
+  headers: readonly string[]
+) {
+  return headers.map((header) => row[header] ?? "");
 }
 
 function rowsToObjects(
   values: string[][],
-  sheetName: SheetName,
-  actualHeaders: string[]
+  headers: readonly string[]
 ): Record<string, string>[] {
-  const lookup = getHeaderLookup(sheetName, actualHeaders);
-  const canonicalHeaders = getCanonicalHeaders(sheetName);
-
   return values
     .filter((row) => row.some((cell) => cell !== ""))
     .map((row) =>
-      canonicalHeaders.reduce<Record<string, string>>((accumulator, header) => {
-        const index = lookup.get(header);
-        accumulator[header] = typeof index === "number" ? row[index] ?? "" : "";
+      headers.reduce<Record<string, string>>((accumulator, header, index) => {
+        accumulator[header] = row[index] ?? "";
         return accumulator;
       }, {})
     );
+}
+
+function normalizeHeader(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function slugify(value: string, fallback: string) {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return slug || fallback;
+}
+
+function inferSkillCategory(skill: string) {
+  const normalized = skill.toLowerCase();
+  if (normalized.includes("coding") || normalized.includes("algorithm")) {
+    return "Coding";
+  }
+  if (normalized.includes("system")) {
+    return "System Design";
+  }
+  if (normalized.includes("ai") || normalized.includes("agent")) {
+    return "AI";
+  }
+  if (normalized.includes("behavior")) {
+    return "Behavioral";
+  }
+
+  return "Core";
+}
+
+const readHeaderAliases: Partial<Record<SheetName, Record<string, string[]>>> = {
+  interviews: {
+    round_type: ["round_type", "round", "stage"],
+    start_time: ["start_time", "time", "start"],
+    end_time: ["end_time", "end"],
+    interviewer: ["interviewer", "recruiter_name", "recruiter"],
+    meeting_link: ["meeting_link", "link", "meeting_url"]
+  },
+  rounds: {
+    round_name: ["round_name", "round", "stage"],
+    time: ["time", "start_time", "start"],
+    format: ["format", "mode"]
+  },
+  tasks: {
+    task_id: ["task_id", "id"],
+    due_date: ["due_date", "deadline"],
+    estimated_minutes: ["estimated_minutes", "estimate_minutes", "estimate"],
+    last_updated: ["last_updated", "updated_at"]
+  },
+  daily_plan: {
+    task_id: ["task_id", "task"],
+    focus_area: ["focus_area", "focus"],
+    notes: ["notes", "task"]
+  },
+  companies: {
+    h1b_sponsorship: ["h1b_sponsorship", "sponsorship", "visa_support", "visa"],
+    salary_band: ["salary_band", "compensation"],
+    target_level: ["target_level", "level"],
+    recruiter: ["recruiter", "recruiter_name"],
+    next_step: ["next_step", "stage"],
+    status: ["status", "stage"]
+  },
+  recruiter_notes: {
+    recruiter_name: ["recruiter_name", "recruiter"],
+    last_contact_date: ["last_contact_date", "date"],
+    next_step: ["next_step", "stage"]
+  },
+  skills: {
+    category: ["category", "focus_area"],
+    target_percent: ["target_percent", "target"],
+    last_updated: ["last_updated", "updated_at"]
+  },
+  dashboard_summary: {
+    last_updated: ["last_updated", "updated_at"]
+  },
+  sync_log: {
+    timestamp: ["timestamp", "time"],
+    sync_type: ["sync_type", "type"]
+  }
+};
+
+function getCanonicalValue(
+  normalizedRow: Record<string, string>,
+  sheetName: SheetName,
+  canonicalHeader: string
+) {
+  const aliases = readHeaderAliases[sheetName]?.[canonicalHeader] ?? [canonicalHeader];
+
+  for (const alias of aliases) {
+    const value = normalizedRow[normalizeHeader(alias)];
+    if (typeof value === "string" && value.length > 0) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function canonicalizeRow(
+  sheetName: SheetName,
+  sourceRow: Record<string, string>,
+  rowIndex: number
+) {
+  const normalizedRow = Object.entries(sourceRow).reduce<Record<string, string>>((accumulator, [key, value]) => {
+    accumulator[normalizeHeader(key)] = value ?? "";
+    return accumulator;
+  }, {});
+
+  const canonicalRow = sheetDefinitions[sheetName].reduce<Record<string, string>>((accumulator, header) => {
+    accumulator[header] = getCanonicalValue(normalizedRow, sheetName, header);
+    return accumulator;
+  }, {});
+
+  if (sheetName === "interviews" && !canonicalRow.event_id) {
+    canonicalRow.event_id = slugify(
+      `${canonicalRow.company}-${canonicalRow.date}-${canonicalRow.round_type}`,
+      `interview-${rowIndex + 1}`
+    );
+  }
+
+  if (sheetName === "tasks") {
+    canonicalRow.task_id = canonicalRow.task_id || `task-${slugify(canonicalRow.task, String(rowIndex + 1))}`;
+    canonicalRow.source = canonicalRow.source || "sheet";
+  }
+
+  if (sheetName === "companies") {
+    canonicalRow.next_step = canonicalRow.next_step || canonicalRow.status;
+  }
+
+  if (sheetName === "skills") {
+    canonicalRow.category = canonicalRow.category || inferSkillCategory(canonicalRow.skill);
+    canonicalRow.target_percent = canonicalRow.target_percent || "100";
+  }
+
+  return canonicalRow;
 }
 
 async function getSheetsClient() {
@@ -135,39 +178,40 @@ async function getSheetsClient() {
   return google.sheets({ version: "v4", auth });
 }
 
-async function getSpreadsheetId() {
+async function getCurrentSheetHeaders(sheetName: SheetName) {
   const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
   if (!spreadsheetId) {
     throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID");
   }
-  return spreadsheetId;
-}
 
-async function getSheetValues(sheetName: SheetName) {
-  const spreadsheetId = await getSpreadsheetId();
   const sheets = await getSheetsClient();
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: toA1Range(sheetName)
+    range: `${sheetName}!1:1`
   });
-  return {
-    spreadsheetId,
-    sheets,
-    values: (response.data.values ?? []) as string[][]
-  };
+
+  return ((response.data.values?.[0] ?? []) as string[]).filter((header) => header.trim().length > 0);
 }
 
 export async function getSpreadsheetMetadata() {
-  const spreadsheetId = await getSpreadsheetId();
+  const env = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!env) {
+    throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID");
+  }
+
   const sheets = await getSheetsClient();
   return sheets.spreadsheets.get({
-    spreadsheetId,
+    spreadsheetId: env,
     includeGridData: false
   });
 }
 
 export async function ensureSpreadsheetStructure() {
-  const spreadsheetId = await getSpreadsheetId();
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) {
+    throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID");
+  }
+
   const sheets = await getSheetsClient();
   const metadata = await getSpreadsheetMetadata();
   const existingNames = new Set(
@@ -205,6 +249,10 @@ export async function ensureSpreadsheetStructure() {
     });
 
     const currentHeaders = (response.data.values?.[0] ?? []) as string[];
+    const hasExpectedHeaders =
+      currentHeaders.length === headers.length &&
+      headers.every((header, index) => currentHeaders[index] === header);
+
     if (currentHeaders.length === 0) {
       await sheets.spreadsheets.values.update({
         spreadsheetId,
@@ -215,30 +263,11 @@ export async function ensureSpreadsheetStructure() {
         }
       });
       logInfo("Initialized empty sheet headers", { sheetName });
-
-      if (sheetName === "dashboard_summary" && sheetSamples[sheetName].length > 0) {
-        await sheets.spreadsheets.values.update({
-          spreadsheetId,
-          range: toA1Range(sheetName),
-          valueInputOption: "RAW",
-          requestBody: {
-            values: [
-              [...headers],
-              ...sheetSamples[sheetName].map((row) =>
-                rowToArray(row as unknown as Record<string, string>, headers)
-              )
-            ]
-          }
-        });
-      }
-    } else {
-      const hasCanonicalHeader = headers.some((header) =>
-        currentHeaders.some((current) => normalizeHeader(current) === normalizeHeader(header))
-      );
-
-      if (!hasCanonicalHeader) {
-        logWarn("Existing sheet uses custom headers; preserving as-is", { sheetName, currentHeaders });
-      }
+    } else if (!hasExpectedHeaders) {
+      logWarn("Preserving existing sheet headers", {
+        sheetName,
+        currentHeaders: currentHeaders.join(",")
+      });
     }
   }
 
@@ -249,72 +278,88 @@ export async function ensureSpreadsheetStructure() {
 }
 
 export async function readSheet(sheetName: SheetName): Promise<Record<string, string>[]> {
-  await ensureSpreadsheetStructure();
-  const { values } = await getSheetValues(sheetName);
-  const actualHeaders = values[0] ?? [];
-  const dataRows = values.slice(1);
-
-  if (actualHeaders.length === 0) {
-    return [];
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) {
+    throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID");
   }
 
-  return rowsToObjects(dataRows, sheetName, actualHeaders);
-}
-
-export async function writeSheet<T extends object>(sheetName: SheetName, rows: T[]) {
-  const spreadsheetId = await getSpreadsheetId();
   await ensureSpreadsheetStructure();
-
   const sheets = await getSheetsClient();
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${sheetName}!1:1`
+    range: toA1Range(sheetName)
   });
+  const values = (response.data.values ?? []) as string[][];
+  const actualHeaders = (values[0] ?? []) as string[];
+  if (actualHeaders.length === 0) {
+    return [];
+  }
+  const dataRows = values.slice(1);
+  const rows = rowsToObjects(dataRows, actualHeaders);
+  return rows.map((row, index) => canonicalizeRow(sheetName, row, index));
+}
 
-  const existingHeaders = (response.data.values?.[0] ?? []) as string[];
-  const canonicalHeaders = getCanonicalHeaders(sheetName);
-  const outputHeaders = existingHeaders.length
-    ? [...existingHeaders, ...canonicalHeaders.filter((header) => !existingHeaders.includes(header))]
-    : canonicalHeaders;
-  const lastColumn = columnNumberToLetter(outputHeaders.length);
+export async function writeSheet<T extends object>(
+  sheetName: SheetName,
+  rows: T[]
+) {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) {
+    throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID");
+  }
 
+  const headers = sheetDefinitions[sheetName];
+  const sheets = await getSheetsClient();
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${sheetName}!A:${lastColumn}`,
+    range: toA1Range(sheetName),
     valueInputOption: "RAW",
     requestBody: {
-      values: [[...outputHeaders], ...rows.map((row) => rowToArray(row, outputHeaders))]
+      values: [[...headers], ...rows.map((row) => rowToArray(row as Record<string, string>, headers))]
     }
   });
 }
 
 export async function appendSyncLogRow(row: SyncLogRow) {
-  const spreadsheetId = await getSpreadsheetId();
-  await ensureSpreadsheetStructure();
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) {
+    throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID");
+  }
 
   const sheets = await getSheetsClient();
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "sync_log!1:1"
-  });
-  const existingHeaders = ((response.data.values?.[0] ?? []) as string[]).length
-    ? ((response.data.values?.[0] ?? []) as string[])
-    : [...sheetDefinitions.sync_log];
-  const outputHeaders = [
-    ...existingHeaders,
-    ...sheetDefinitions.sync_log.filter((header) => !existingHeaders.includes(header))
-  ];
-
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `sync_log!A:${columnNumberToLetter(outputHeaders.length)}`,
+    range: "sync_log!A:D",
     valueInputOption: "RAW",
     requestBody: {
-      values: [rowToArray(row as unknown as Record<string, string>, outputHeaders)]
+      values: [
+        [
+          row.timestamp,
+          row.sync_type,
+          row.status,
+          row.details
+        ]
+      ]
     }
   });
 }
 
 export async function writeDashboardSummaryRows(rows: DashboardSummaryRow[]) {
-  await writeSheet("dashboard_summary", rows);
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) {
+    throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID");
+  }
+
+  const headers = await getCurrentSheetHeaders("dashboard_summary");
+  const effectiveHeaders = headers.length > 0 ? headers : [...sheetDefinitions.dashboard_summary];
+  const sheets = await getSheetsClient();
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: toA1Range("dashboard_summary"),
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [[...effectiveHeaders], ...rows.map((row) => rowToArray(row as unknown as Record<string, string>, effectiveHeaders))]
+    }
+  });
 }

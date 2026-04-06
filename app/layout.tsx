@@ -4,7 +4,7 @@ import "@/app/globals.css";
 
 export const metadata: Metadata = {
   title: "Interview Mission Control Dashboard",
-  description: "Google Sheets powered interview planning dashboard with a linked Drive workspace."
+  description: "Google Sheets powered interview planning dashboard."
 };
 
 export default function RootLayout({

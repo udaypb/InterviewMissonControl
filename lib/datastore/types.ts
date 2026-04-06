@@ -21,7 +21,6 @@ export interface InterviewRow {
   end_time: string;
   round_type: string;
   status: string;
-  priority: string;
   interviewer: string;
   meeting_link: string;
   notes: string;

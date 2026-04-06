@@ -13,44 +13,25 @@ import type {
   TaskRow
 } from "@/lib/datastore/types";
 import { compareIsoDates, formatDateLabel, formatDateTimeLabel, humanNowLine, relativeUrgency } from "@/lib/utils/date";
-import { clampPercent, compactText } from "@/lib/utils/formatting";
+import { clampPercent, compactText, formatCountLabel } from "@/lib/utils/formatting";
 
-function makeStableId(...parts: string[]) {
-  return parts
-    .join("-")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "item";
+function getPriorityRank(priority: string) {
+  switch (priority.trim().toLowerCase()) {
+    case "highest":
+      return 4;
+    case "high":
+      return 3;
+    case "medium":
+      return 2;
+    case "low":
+      return 1;
+    default:
+      return 0;
+  }
 }
 
-function getPriorityRank(value: string) {
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "highest") {
-    return 5;
-  }
-  if (normalized === "very high") {
-    return 4;
-  }
-  if (normalized === "high") {
-    return 3;
-  }
-  if (normalized === "medium") {
-    return 2;
-  }
-  if (normalized === "low") {
-    return 1;
-  }
-  return 0;
-}
-
-function getFallbackTargetPercent(progressPercent: number) {
-  if (progressPercent >= 85) {
-    return 95;
-  }
-  if (progressPercent >= 70) {
-    return 90;
-  }
-  return 85;
+function isCompletedStatus(status: string) {
+  return ["done", "completed", "complete"].includes(status.trim().toLowerCase());
 }
 
 function getInterviewCalendar(snapshot: StorageSnapshot): InterviewCalendarItem[] {
@@ -60,7 +41,7 @@ function getInterviewCalendar(snapshot: StorageSnapshot): InterviewCalendarItem[
       company: row.company,
       roundType: row.round_type,
       dateLabel: formatDateLabel(row.date),
-      timeLabel: row.start_time ? `${row.start_time}${row.end_time ? ` - ${row.end_time}` : ""}` : "Time TBD",
+      timeLabel: row.start_time ? `${row.start_time}${row.end_time ? ` - ${row.end_time}` : ""}` : "TBD",
       status: row.status,
       interviewer: row.interviewer,
       meetingLink: row.meeting_link
@@ -68,23 +49,25 @@ function getInterviewCalendar(snapshot: StorageSnapshot): InterviewCalendarItem[
 }
 
 function scoreTask(task: TaskRow) {
-  const dueTime = new Date(task.due_date).getTime();
-  const dueDays = Number.isNaN(dueTime) ? 7 : Math.ceil((dueTime - Date.now()) / 86_400_000);
-  const priorityWeight = getPriorityRank(task.priority) * 12 || 12;
-  const statusPenalty = task.status.toLowerCase() === "done" ? -100 : 0;
+  const dueDate = new Date(task.due_date);
+  const dueDays = Number.isNaN(dueDate.getTime())
+    ? Number.POSITIVE_INFINITY
+    : Math.ceil((dueDate.getTime() - Date.now()) / 86_400_000);
+  const priorityWeight = getPriorityRank(task.priority) * 14;
+  const statusPenalty = isCompletedStatus(task.status) ? -100 : 0;
   return priorityWeight + Math.max(0, 10 - dueDays) * 4 + statusPenalty;
 }
 
 function getPriorities(snapshot: StorageSnapshot): PriorityItem[] {
   return snapshot.tasks
-    .filter((task) => task.status.toLowerCase() !== "done")
-    .map((task, index) => ({
-      id: task.task_id || makeStableId(task.task, task.company, String(index + 1)),
+    .filter((task) => !isCompletedStatus(task.status))
+    .map((task) => ({
+      id: task.task_id,
       label: task.task,
-      company: task.company || "General",
+      company: compactText(task.company, "General"),
       score: scoreTask(task),
       reason: compactText(task.notes, `${task.category} preparation`),
-      dueLabel: task.due_date ? formatDateLabel(task.due_date) : "Unscheduled"
+      dueLabel: task.due_date ? formatDateLabel(task.due_date) : "No due date"
     }))
     .sort((left, right) => right.score - left.score)
     .slice(0, 6);
@@ -93,14 +76,14 @@ function getPriorities(snapshot: StorageSnapshot): PriorityItem[] {
 function getBattlePlan(snapshot: StorageSnapshot): BattlePlanItem[] {
   const taskMap = new Map(snapshot.tasks.map((task) => [task.task_id, task]));
   const prioritizedPlan = snapshot.dailyPlan
-    .map((row, index) => {
+    .map((row) => {
       const task = taskMap.get(row.task_id);
       return {
-        id: row.task_id || makeStableId(row.slot, row.focus_area, String(index + 1)),
-        slot: row.slot || relativeUrgency(row.date),
+        id: row.task_id,
+        slot: row.slot,
         title: task?.task || row.focus_area,
         company: task?.company || "General",
-        urgency: row.priority || task?.priority || "derived",
+        urgency: row.priority,
         notes: row.notes || task?.notes || row.focus_area
       };
     })
@@ -139,25 +122,19 @@ function getCompanyIntel(snapshot: StorageSnapshot): CompanyIntelCard[] {
 
   return snapshot.companies.map((company) => {
     const recruiterNote = notesByCompany.get(company.company);
-    const interviewEvents = snapshot.interviews
-      .filter((row) => row.company === company.company)
-      .map((row) => `${row.round_type} · ${formatDateTimeLabel(row.date, row.start_time)} · ${row.status}`);
-
+    const status = compactText(company.status, "Unknown");
     return {
       company: company.company,
-      sponsorship: compactText(company.h1b_sponsorship, "Not yet logged"),
-      interviewProcess: roundsByCompany.get(company.company) ||
-        (interviewEvents.length > 0 ? interviewEvents : [company.status ? `${company.status} stage` : "No rounds logged yet."]),
-      focusAreas:
-        gapsByCompany.get(company.company) ??
-        [compactText(company.notes, "No specific focus area logged yet.")],
-      tip: recruiterNote?.notes || compactText(company.next_step, "Keep this pipeline warm."),
+      sponsorship: compactText(company.h1b_sponsorship, "Unknown"),
+      interviewProcess: roundsByCompany.get(company.company) ?? [`Current stage: ${status}`],
+      focusAreas: gapsByCompany.get(company.company) ?? [compactText(company.notes, "No specific focus area yet.")],
+      tip: recruiterNote?.notes || compactText(company.next_step, compactText(company.notes, "Keep this pipeline warm.")),
       yourAngle: compactText(company.notes, "Frame the strongest operator story for this company."),
-      compensation: compactText(company.salary_band, "Comp not logged"),
-      targetLevel: compactText(company.target_level, "Level not logged"),
-      nextStep: compactText(company.next_step, recruiterNote?.next_step || "Next step not logged"),
-      recruiter: compactText(company.recruiter, recruiterNote?.recruiter_name || "Recruiter not logged"),
-      status: compactText(company.status, company.priority || "Tracking")
+      compensation: compactText(company.salary_band, "Not tracked"),
+      targetLevel: compactText(company.target_level, "Not set"),
+      nextStep: compactText(company.next_step, status),
+      recruiter: compactText(company.recruiter, "Not assigned"),
+      status
     };
   });
 }
@@ -167,9 +144,9 @@ function getSkillMap(snapshot: StorageSnapshot): SkillMapItem[] {
 
   return snapshot.skills.map((skill) => ({
     skill: skill.skill,
-    category: compactText(skill.category, "General"),
+    category: skill.category,
     progressPercent: clampPercent(skill.progress_percent),
-    targetPercent: clampPercent(skill.target_percent) || getFallbackTargetPercent(clampPercent(skill.progress_percent)),
+    targetPercent: clampPercent(skill.target_percent),
     weakestForCompany: weakestForSkill.get(skill.skill)
   }));
 }
@@ -206,29 +183,22 @@ function getTopStats(snapshot: StorageSnapshot, priorities: PriorityItem[]): Sum
     const diff = new Date(row.date).getTime() - Date.now();
     return diff >= 0 && diff <= 7 * 86_400_000;
   }).length;
-  const urgentInterview = [...snapshot.interviews].sort(
-    (left, right) => getPriorityRank(right.priority) - getPriorityRank(left.priority)
-  )[0];
 
   return [
     {
       label: "Next Interview",
       value: nextInterview ? `${nextInterview.company} · ${nextInterview.round_type}` : "No interview set",
-      detail: nextInterview ? formatDateTimeLabel(nextInterview.date, nextInterview.start_time) : "Run a sync to pull calendar events"
+      detail: nextInterview ? formatDateTimeLabel(nextInterview.date, nextInterview.start_time) : "Add rows in the interviews sheet to populate this board"
     },
     {
       label: "This Week",
-      value: weekCount > 0 ? `${weekCount} interviews scheduled` : "No interviews scheduled",
-      detail: `${snapshot.interviews.length} total interview events on the board`
+      value: formatCountLabel(weekCount, "loop"),
+      detail: `${snapshot.interviews.length} interview events on the board`
     },
     {
       label: "Urgent Item",
-      value: priorities[0]?.label || urgentInterview?.company || "Queue stable",
-      detail:
-        priorities[0]?.reason ||
-        (urgentInterview
-          ? compactText(urgentInterview.notes, `${urgentInterview.round_type} is highest priority`)
-          : "No immediate blocker")
+      value: priorities[0]?.label || "Queue stable",
+      detail: priorities[0]?.reason || "No immediate blocker"
     }
   ];
 }
@@ -251,7 +221,7 @@ function getMentorFocus(snapshot: StorageSnapshot, priorities: PriorityItem[], s
       variant: "green" as const,
       title: "Sponsorship Strategy",
       body: topCompany
-        ? `${topCompany.company} remains the highest leverage lane. Keep ${compactText(topCompany.h1b_sponsorship, "sponsorship context TBD").toLowerCase()} context explicit and stay close to ${compactText(topCompany.next_step, "the next step")}.`
+        ? `${topCompany.company} remains the highest leverage lane. Keep ${compactText(topCompany.h1b_sponsorship, "unknown").toLowerCase()} sponsorship context explicit and stay close to ${compactText(topCompany.next_step, topCompany.status || "the current stage")}.`
         : "No company priorities are loaded yet."
     },
     {
@@ -267,8 +237,8 @@ function getMentorFocus(snapshot: StorageSnapshot, priorities: PriorityItem[], s
 function getResources(snapshot: StorageSnapshot) {
   return snapshot.companies.slice(0, 3).map((company) => ({
     title: company.company,
-    subtitle: company.recruiter || company.status || "No recruiter",
-    body: compactText(company.notes, company.next_step)
+    subtitle: compactText(company.recruiter, compactText(company.status, "No recruiter")),
+    body: compactText(company.notes, compactText(company.next_step, "No notes yet"))
   }));
 }
 
@@ -306,11 +276,7 @@ export function assembleDashboardPayload(
       )
     ),
     resources: getResources(snapshot),
-    weakestArea:
-      summaryMap.get("weakest_area") ||
-      summaryMap.get("weakest_skill") ||
-      [...skillMap].sort((left, right) => left.progressPercent - right.progressPercent)[0]?.skill ||
-      "Unknown",
+    weakestArea: skillMap.sort((left, right) => left.progressPercent - right.progressPercent)[0]?.skill || "Unknown",
     configStatus: configStatus ?? {
       healthy: true,
       label: "Config healthy",
@@ -370,11 +336,6 @@ export function buildSummaryRows(payload: DashboardPayload): DashboardSummaryRow
     },
     {
       key: "weakest_skill",
-      value: payload.weakestArea,
-      last_updated: timestamp
-    },
-    {
-      key: "weakest_area",
       value: payload.weakestArea,
       last_updated: timestamp
     },
