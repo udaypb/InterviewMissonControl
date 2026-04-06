@@ -10,9 +10,11 @@ import type {
   SkillMapItem,
   StorageSnapshot,
   SummaryStat,
-  TaskRow
+  TaskRow,
+  InterviewRow,
+  DailyPlanRow
 } from "@/lib/datastore/types";
-import { compareIsoDates, formatDateLabel, formatDateTimeLabel, humanNowLine, relativeUrgency } from "@/lib/utils/date";
+import { compareIsoDates, formatDateLabel, formatDateTimeLabel, getTodayIsoDate, humanNowLine, relativeUrgency } from "@/lib/utils/date";
 import { clampPercent, compactText, formatCountLabel } from "@/lib/utils/formatting";
 
 function getPriorityRank(priority: string) {
@@ -34,15 +36,58 @@ function isCompletedStatus(status: string) {
   return ["done", "completed", "complete"].includes(status.trim().toLowerCase());
 }
 
+function isInterviewTerminalStatus(status: string) {
+  return ["completed", "complete", "cancelled", "canceled", "ghosted", "rejected", "declined"].includes(
+    status.trim().toLowerCase()
+  );
+}
+
+function isTodayOrFuture(date: string) {
+  return Boolean(date) && date >= getTodayIsoDate();
+}
+
+function isPastDate(date: string) {
+  return Boolean(date) && date < getTodayIsoDate();
+}
+
+function getUpcomingInterviews(interviews: InterviewRow[]) {
+  return interviews
+    .filter((row) => isTodayOrFuture(row.date) && !isInterviewTerminalStatus(row.status))
+    .sort((left, right) => compareIsoDates(left.date, right.date));
+}
+
+function getOpenDailyPlanRows(rows: DailyPlanRow[]) {
+  return rows
+    .filter((row) => !row.date || isTodayOrFuture(row.date))
+    .sort((left, right) => compareIsoDates(left.date || getTodayIsoDate(), right.date || getTodayIsoDate()));
+}
+
+function getInterviewDisplayStatus(row: InterviewRow) {
+  if (isPastDate(row.date) && !isInterviewTerminalStatus(row.status)) {
+    return "past";
+  }
+
+  return row.status;
+}
+
 function getInterviewCalendar(snapshot: StorageSnapshot): InterviewCalendarItem[] {
   return [...snapshot.interviews]
-    .sort((left, right) => compareIsoDates(left.date, right.date))
+    .sort((left, right) => {
+      const leftUpcoming = isTodayOrFuture(left.date) && !isInterviewTerminalStatus(left.status) ? 0 : 1;
+      const rightUpcoming = isTodayOrFuture(right.date) && !isInterviewTerminalStatus(right.status) ? 0 : 1;
+
+      if (leftUpcoming !== rightUpcoming) {
+        return leftUpcoming - rightUpcoming;
+      }
+
+      return compareIsoDates(left.date, right.date);
+    })
     .map((row) => ({
       company: row.company,
       roundType: row.round_type,
       dateLabel: formatDateLabel(row.date),
       timeLabel: row.start_time ? `${row.start_time}${row.end_time ? ` - ${row.end_time}` : ""}` : "TBD",
-      status: row.status,
+      status: getInterviewDisplayStatus(row),
       interviewer: row.interviewer,
       meetingLink: row.meeting_link
     }));
@@ -67,6 +112,7 @@ function getPriorities(snapshot: StorageSnapshot): PriorityItem[] {
       company: compactText(task.company, "General"),
       score: scoreTask(task),
       reason: compactText(task.notes, `${task.category} preparation`),
+      dueDate: task.due_date,
       dueLabel: task.due_date ? formatDateLabel(task.due_date) : "No due date"
     }))
     .sort((left, right) => right.score - left.score)
@@ -75,7 +121,7 @@ function getPriorities(snapshot: StorageSnapshot): PriorityItem[] {
 
 function getBattlePlan(snapshot: StorageSnapshot): BattlePlanItem[] {
   const taskMap = new Map(snapshot.tasks.map((task) => [task.task_id, task]));
-  const prioritizedPlan = snapshot.dailyPlan
+  const prioritizedPlan = getOpenDailyPlanRows(snapshot.dailyPlan)
     .map((row) => {
       const task = taskMap.get(row.task_id);
       return {
@@ -95,7 +141,7 @@ function getBattlePlan(snapshot: StorageSnapshot): BattlePlanItem[] {
 
   return getPriorities(snapshot).slice(0, 4).map((item) => ({
     id: item.id,
-    slot: relativeUrgency(item.dueLabel),
+    slot: item.dueDate ? relativeUrgency(item.dueDate) : "Soon",
     title: item.label,
     company: item.company,
     urgency: "derived",
@@ -178,9 +224,10 @@ function getWeeklyProgress(snapshot: StorageSnapshot): ProgressMetric[] {
 }
 
 function getTopStats(snapshot: StorageSnapshot, priorities: PriorityItem[]): SummaryStat[] {
-  const nextInterview = [...snapshot.interviews].sort((left, right) => compareIsoDates(left.date, right.date))[0];
-  const weekCount = snapshot.interviews.filter((row) => {
-    const diff = new Date(row.date).getTime() - Date.now();
+  const upcomingInterviews = getUpcomingInterviews(snapshot.interviews);
+  const nextInterview = upcomingInterviews[0];
+  const weekCount = upcomingInterviews.filter((row) => {
+    const diff = new Date(row.date).getTime() - new Date(getTodayIsoDate()).getTime();
     return diff >= 0 && diff <= 7 * 86_400_000;
   }).length;
 
@@ -193,7 +240,7 @@ function getTopStats(snapshot: StorageSnapshot, priorities: PriorityItem[]): Sum
     {
       label: "This Week",
       value: formatCountLabel(weekCount, "loop"),
-      detail: `${snapshot.interviews.length} interview events on the board`
+      detail: `${upcomingInterviews.length} upcoming interview events on the board`
     },
     {
       label: "Urgent Item",

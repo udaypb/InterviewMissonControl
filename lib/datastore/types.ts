@@ -179,6 +179,7 @@ export interface PriorityItem {
   company: string;
   score: number;
   reason: string;
+  dueDate: string;
   dueLabel: string;
 }
 

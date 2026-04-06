@@ -2,6 +2,24 @@ export function getNow(): Date {
   return new Date();
 }
 
+const APP_TIMEZONE = "America/Los_Angeles";
+
+export function getTodayIsoDate(): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+
+  const parts = formatter.formatToParts(getNow());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  return year && month && day ? `${year}-${month}-${day}` : getNow().toISOString().slice(0, 10);
+}
+
 export function getRollingWindow(daysAhead = 21): { timeMin: string; timeMax: string } {
   const now = getNow();
   const max = new Date(now);
