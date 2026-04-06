@@ -5,6 +5,12 @@ import type { DashboardSummaryRow, SheetName, SyncLogRow } from "@/lib/datastore
 import { getSheetsAuth } from "@/lib/google/auth";
 import { logInfo, logWarn } from "@/lib/utils/logging";
 
+const STRUCTURE_CACHE_TTL_MS = 5 * 60_000;
+
+declare global {
+  var __missionControlSheetsStructureCheckedAt__: number | undefined;
+}
+
 function toA1Range(sheetName: string) {
   return `${sheetName}!A:Z`;
 }
@@ -193,6 +199,14 @@ async function getCurrentSheetHeaders(sheetName: SheetName) {
   return ((response.data.values?.[0] ?? []) as string[]).filter((header) => header.trim().length > 0);
 }
 
+function getStructureCacheTimestamp() {
+  return globalThis.__missionControlSheetsStructureCheckedAt__ ?? 0;
+}
+
+function markStructureCacheFresh() {
+  globalThis.__missionControlSheetsStructureCheckedAt__ = Date.now();
+}
+
 export async function getSpreadsheetMetadata() {
   const env = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
   if (!env) {
@@ -207,6 +221,13 @@ export async function getSpreadsheetMetadata() {
 }
 
 export async function ensureSpreadsheetStructure() {
+  if (Date.now() - getStructureCacheTimestamp() < STRUCTURE_CACHE_TTL_MS) {
+    return {
+      spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || "",
+      spreadsheetTitle
+    };
+  }
+
   const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
   if (!spreadsheetId) {
     throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID");
@@ -271,10 +292,26 @@ export async function ensureSpreadsheetStructure() {
     }
   }
 
+  markStructureCacheFresh();
+
   return {
     spreadsheetId,
     spreadsheetTitle
   };
+}
+
+function parseSheetValues(
+  sheetName: SheetName,
+  values: string[][]
+) {
+  const actualHeaders = (values[0] ?? []) as string[];
+  if (actualHeaders.length === 0) {
+    return [];
+  }
+
+  const dataRows = values.slice(1);
+  const rows = rowsToObjects(dataRows, actualHeaders);
+  return rows.map((row, index) => canonicalizeRow(sheetName, row, index));
 }
 
 export async function readSheet(sheetName: SheetName): Promise<Record<string, string>[]> {
@@ -290,13 +327,29 @@ export async function readSheet(sheetName: SheetName): Promise<Record<string, st
     range: toA1Range(sheetName)
   });
   const values = (response.data.values ?? []) as string[][];
-  const actualHeaders = (values[0] ?? []) as string[];
-  if (actualHeaders.length === 0) {
-    return [];
+  return parseSheetValues(sheetName, values);
+}
+
+export async function readSheets(sheetNames: SheetName[]) {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) {
+    throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID");
   }
-  const dataRows = values.slice(1);
-  const rows = rowsToObjects(dataRows, actualHeaders);
-  return rows.map((row, index) => canonicalizeRow(sheetName, row, index));
+
+  await ensureSpreadsheetStructure();
+  const sheets = await getSheetsClient();
+  const response = await sheets.spreadsheets.values.batchGet({
+    spreadsheetId,
+    ranges: sheetNames.map((sheetName) => toA1Range(sheetName))
+  });
+
+  const valueRanges = response.data.valueRanges ?? [];
+  const parsedEntries = sheetNames.map((sheetName, index) => [
+    sheetName,
+    parseSheetValues(sheetName, (valueRanges[index]?.values ?? []) as string[][])
+  ]);
+
+  return Object.fromEntries(parsedEntries) as Record<SheetName, Record<string, string>[]>;
 }
 
 export async function writeSheet<T extends object>(

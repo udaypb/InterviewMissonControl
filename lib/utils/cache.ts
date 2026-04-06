@@ -1,6 +1,7 @@
 type CacheEntry<T> = {
   expiresAt: number;
-  value: T;
+  value?: T;
+  pending?: Promise<T>;
 };
 
 declare global {
@@ -22,14 +23,28 @@ export async function getOrSetCache<T>(
 ): Promise<T> {
   const store = getCacheStore();
   const existing = store.get(key);
+  const now = Date.now();
 
-  if (existing && existing.expiresAt > Date.now()) {
+  if (existing?.pending) {
+    return existing.pending as Promise<T>;
+  }
+
+  if (existing && existing.expiresAt > now && existing.value !== undefined) {
     return existing.value as T;
   }
 
-  const value = await compute();
-  store.set(key, { value, expiresAt: Date.now() + ttlMs });
-  return value;
+  const pending = compute()
+    .then((value) => {
+      store.set(key, { value, expiresAt: Date.now() + ttlMs });
+      return value;
+    })
+    .catch((error) => {
+      store.delete(key);
+      throw error;
+    });
+
+  store.set(key, { expiresAt: now + ttlMs, pending });
+  return pending;
 }
 
 export function invalidateCache(prefix?: string) {

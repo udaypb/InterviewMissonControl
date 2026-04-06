@@ -15,7 +15,7 @@ import type {
 } from "@/lib/datastore/types";
 import { assembleDashboardPayload, buildSummaryRows } from "@/lib/datastore/dashboardAssembler";
 import { ensureDriveWorkspaceStructure, getDriveWorkspaceStatus } from "@/lib/google/drive";
-import { appendSyncLogRow, ensureSpreadsheetStructure, readSheet, writeDashboardSummaryRows } from "@/lib/google/sheets";
+import { appendSyncLogRow, ensureSpreadsheetStructure, readSheets, writeDashboardSummaryRows } from "@/lib/google/sheets";
 import { getOrSetCache, invalidateCache } from "@/lib/utils/cache";
 import { logError } from "@/lib/utils/logging";
 import {
@@ -177,30 +177,30 @@ async function getSystemConfigurationStatus(): Promise<ConfigStatus> {
 async function readSnapshot(): Promise<StorageSnapshot> {
   await ensureSpreadsheetStructure();
 
-  const [
+  const {
     interviews,
     rounds,
     tasks,
-    dailyPlan,
+    daily_plan: dailyPlan,
     companies,
-    recruiterNotes,
+    recruiter_notes: recruiterNotes,
     skills,
-    skillGaps,
-    behavioralStories,
-    summaryRows,
-    syncLog
-  ] = await Promise.all([
-    readSheet("interviews"),
-    readSheet("rounds"),
-    readSheet("tasks"),
-    readSheet("daily_plan"),
-    readSheet("companies"),
-    readSheet("recruiter_notes"),
-    readSheet("skills"),
-    readSheet("skill_gaps"),
-    readSheet("behavioral_stories"),
-    readSheet("dashboard_summary"),
-    readSheet("sync_log")
+    skill_gaps: skillGaps,
+    behavioral_stories: behavioralStories,
+    dashboard_summary: summaryRows,
+    sync_log: syncLog
+  } = await readSheets([
+    "interviews",
+    "rounds",
+    "tasks",
+    "daily_plan",
+    "companies",
+    "recruiter_notes",
+    "skills",
+    "skill_gaps",
+    "behavioral_stories",
+    "dashboard_summary",
+    "sync_log"
   ]);
 
   const parsedInterviews = parseRows(interviews, interviewRowSchema);
@@ -222,17 +222,21 @@ async function readSnapshot(): Promise<StorageSnapshot> {
   };
 }
 
+async function getCachedSnapshot() {
+  return getOrSetCache("storage-snapshot", dashboardConfig.cacheTtlMs, readSnapshot);
+}
+
 export class SheetsDataStore implements DataStore {
   async getDashboardSummary(): Promise<DashboardPayload> {
     return getOrSetCache("dashboard-summary", dashboardConfig.cacheTtlMs, async () => {
-      const snapshot = await readSnapshot();
+      const snapshot = await getCachedSnapshot();
       return assembleDashboardPayload(snapshot, await getSystemConfigurationStatus());
     });
   }
 
   async getInterviews(): Promise<InterviewsPayload> {
     return getOrSetCache("interviews", dashboardConfig.cacheTtlMs, async () => {
-      const snapshot = await readSnapshot();
+      const snapshot = await getCachedSnapshot();
       const dashboard = assembleDashboardPayload(snapshot, await getSystemConfigurationStatus());
       return {
         interviews: dashboard.interviewCalendar,
@@ -244,7 +248,7 @@ export class SheetsDataStore implements DataStore {
 
   async getTasks(): Promise<TasksPayload> {
     return getOrSetCache("tasks", dashboardConfig.cacheTtlMs, async () => {
-      const snapshot = await readSnapshot();
+      const snapshot = await getCachedSnapshot();
       const dashboard = assembleDashboardPayload(snapshot, await getSystemConfigurationStatus());
       return {
         tasks: snapshot.tasks,
@@ -256,7 +260,7 @@ export class SheetsDataStore implements DataStore {
 
   async getCompanies(): Promise<CompaniesPayload> {
     return getOrSetCache("companies", dashboardConfig.cacheTtlMs, async () => {
-      const snapshot = await readSnapshot();
+      const snapshot = await getCachedSnapshot();
       const dashboard = assembleDashboardPayload(snapshot, await getSystemConfigurationStatus());
       return {
         companies: dashboard.companyIntel,
@@ -267,7 +271,7 @@ export class SheetsDataStore implements DataStore {
 
   async getSkills(): Promise<SkillsPayload> {
     return getOrSetCache("skills", dashboardConfig.cacheTtlMs, async () => {
-      const snapshot = await readSnapshot();
+      const snapshot = await getCachedSnapshot();
       const dashboard = assembleDashboardPayload(snapshot, await getSystemConfigurationStatus());
       return {
         skills: dashboard.skillMap,
@@ -280,7 +284,7 @@ export class SheetsDataStore implements DataStore {
   async syncDashboard(): Promise<SyncResult> {
     try {
       await ensureDriveWorkspaceStructure().catch(() => undefined);
-      const snapshot = await readSnapshot();
+      const snapshot = await getCachedSnapshot();
       const dashboard = assembleDashboardPayload(snapshot, await getSystemConfigurationStatus());
       const syncedAt = new Date().toISOString();
       dashboard.lastSyncedAt = syncedAt;
