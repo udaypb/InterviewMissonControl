@@ -7,6 +7,7 @@ import type {
   DataStore,
   InterviewRow,
   InterviewsPayload,
+  RoundRow,
   SkillsPayload,
   StorageSnapshot,
   SyncResult,
@@ -62,10 +63,11 @@ function inferCompanyFromTaskTitle(title: string) {
   return companyTokens[0] || "";
 }
 
-function enrichTasks(tasks: TaskRow[], companies: CompanyRow[], interviews: InterviewRow[]) {
+function enrichTasks(tasks: TaskRow[], companies: CompanyRow[], interviews: InterviewRow[], rounds: RoundRow[]) {
   const knownCompanies = [...new Set([
     ...companies.map((company) => company.company).filter(Boolean),
-    ...interviews.map((interview) => interview.company).filter(Boolean)
+    ...interviews.map((interview) => interview.company).filter(Boolean),
+    ...rounds.map((round) => round.company).filter(Boolean)
   ])];
 
   return tasks.map((task) => {
@@ -178,8 +180,6 @@ async function getSystemConfigurationStatus(): Promise<ConfigStatus> {
 }
 
 async function readSnapshot(): Promise<StorageSnapshot> {
-  await ensureSpreadsheetStructure();
-
   const {
     interviews,
     rounds,
@@ -207,12 +207,13 @@ async function readSnapshot(): Promise<StorageSnapshot> {
   ]);
 
   const parsedInterviews = parseRows(interviews, interviewRowSchema);
+  const parsedRounds = parseRows(rounds, roundRowSchema);
   const parsedCompanies = parseRows(companies, companyRowSchema);
-  const parsedTasks = enrichTasks(parseRows(tasks, taskRowSchema), parsedCompanies, parsedInterviews);
+  const parsedTasks = enrichTasks(parseRows(tasks, taskRowSchema), parsedCompanies, parsedInterviews, parsedRounds);
 
   return {
     interviews: parsedInterviews,
-    rounds: parseRows(rounds, roundRowSchema),
+    rounds: parsedRounds,
     tasks: parsedTasks,
     dailyPlan: parseRows(dailyPlan, dailyPlanRowSchema),
     companies: parsedCompanies,
@@ -287,19 +288,21 @@ export class SheetsDataStore implements DataStore {
   async syncDashboard(): Promise<SyncResult> {
     try {
       await ensureDriveWorkspaceStructure().catch(() => undefined);
+      await ensureSpreadsheetStructure();
+      invalidateCache("storage-snapshot");
       const snapshot = await getCachedSnapshot();
       const dashboard = assembleDashboardPayload(snapshot, await getSystemConfigurationStatus());
       const syncedAt = new Date().toISOString();
       dashboard.lastSyncedAt = syncedAt;
       dashboard.lastSyncStatus = "success";
-      dashboard.syncMessage = `Dashboard refreshed from Google Sheets. ${snapshot.interviews.length} interview rows available.`;
+      dashboard.syncMessage = `Dashboard refreshed from Google Sheets. ${dashboard.interviewCalendar.length} event rows available.`;
 
       await writeDashboardSummaryRows(buildSummaryRows(dashboard));
       await appendSyncLogRow({
         timestamp: syncedAt,
         sync_type: "sheets_refresh",
         status: "success",
-        details: `Dashboard summary rebuilt from Google Sheets. ${snapshot.interviews.length} interview rows read.`
+        details: `Dashboard summary rebuilt from Google Sheets. ${dashboard.interviewCalendar.length} event rows read.`
       });
 
       invalidateCache();
@@ -307,7 +310,7 @@ export class SheetsDataStore implements DataStore {
       return {
         status: "success",
         message: dashboard.syncMessage,
-        syncedCount: snapshot.interviews.length,
+        syncedCount: dashboard.interviewCalendar.length,
         lastSyncedAt: syncedAt,
         dashboard
       };

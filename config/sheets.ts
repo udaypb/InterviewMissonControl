@@ -24,9 +24,13 @@ export const sheetDefinitions = {
     "date",
     "time",
     "status",
+    "priority",
+    "next_step",
     "interviewer",
     "format",
-    "notes"
+    "notes",
+    "is_latest_for_company",
+    "is_next_upcoming"
   ],
   tasks: [
     "task_id",
@@ -155,9 +159,13 @@ export const sheetSamples: {
       date: "2026-04-08",
       time: "10:00 AM",
       status: "scheduled",
+      priority: "high",
+      next_step: "Prepare examples and system tradeoffs",
       interviewer: "Jordan Lee",
       format: "virtual",
-      notes: "Practice payments edge cases."
+      notes: "Practice payments edge cases.",
+      is_latest_for_company: "false",
+      is_next_upcoming: "true"
     },
     {
       company: "Anthropic",
@@ -165,9 +173,13 @@ export const sheetSamples: {
       date: "2026-04-11",
       time: "02:00 PM",
       status: "scheduled",
+      priority: "medium",
+      next_step: "Expect product intuition prompts",
       interviewer: "Riley Chen",
       format: "virtual",
-      notes: "Expect product intuition prompts."
+      notes: "Expect product intuition prompts.",
+      is_latest_for_company: "false",
+      is_next_upcoming: "true"
     }
   ],
   tasks: [

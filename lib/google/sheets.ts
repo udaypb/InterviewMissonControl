@@ -74,29 +74,47 @@ function inferSkillCategory(skill: string) {
 
 const readHeaderAliases: Partial<Record<SheetName, Record<string, string[]>>> = {
   interviews: {
-    round_type: ["round_type", "round", "stage"],
+    date: ["date", "event_date"],
+    round_type: ["event_type", "round_type", "round", "stage"],
+    status: ["status"],
     start_time: ["start_time", "time", "start"],
     end_time: ["end_time", "end"],
     interviewer: ["interviewer", "recruiter_name", "recruiter"],
-    meeting_link: ["meeting_link", "link", "meeting_url"]
+    meeting_link: ["meeting_link", "link", "meeting_url"],
+    notes: ["notes", "next_step"]
   },
   rounds: {
-    round_name: ["round_name", "round", "stage"],
+    round_name: ["round_name", "round", "stage", "event_type", "status"],
+    date: ["date", "event_date"],
     time: ["time", "start_time", "start"],
-    format: ["format", "mode"]
+    status: ["status", "stage"],
+    priority: ["priority"],
+    next_step: ["next_step"],
+    interviewer: ["interviewer", "recruiter_name", "recruiter"],
+    format: ["format", "mode"],
+    is_latest_for_company: ["is_latest_for_company"],
+    is_next_upcoming: ["is_next_upcoming"]
   },
   tasks: {
     task_id: ["task_id", "id"],
+    task: ["task", "focus_area"],
+    company: ["company"],
+    category: ["category"],
+    priority: ["priority"],
+    status: ["status"],
     due_date: ["due_date", "deadline"],
     estimated_minutes: ["estimated_minutes", "estimate_minutes", "estimate"],
+    notes: ["notes"],
     last_updated: ["last_updated", "updated_at"]
   },
   daily_plan: {
     task_id: ["task_id", "task"],
-    focus_area: ["focus_area", "focus"],
+    slot: ["slot"],
+    focus_area: ["focus_area", "focus", "task"],
     notes: ["notes", "task"]
   },
   companies: {
+    priority: ["priority"],
     h1b_sponsorship: ["h1b_sponsorship", "sponsorship", "visa_support", "visa"],
     salary_band: ["salary_band", "compensation"],
     target_level: ["target_level", "level"],
@@ -110,11 +128,15 @@ const readHeaderAliases: Partial<Record<SheetName, Record<string, string[]>>> = 
     next_step: ["next_step", "stage"]
   },
   skills: {
+    progress_percent: ["progress_percent"],
+    notes: ["notes"],
     category: ["category", "focus_area"],
     target_percent: ["target_percent", "target"],
     last_updated: ["last_updated", "updated_at"]
   },
   dashboard_summary: {
+    key: ["key"],
+    value: ["value"],
     last_updated: ["last_updated", "updated_at"]
   },
   sync_log: {
@@ -160,6 +182,8 @@ function canonicalizeRow(
       `${canonicalRow.company}-${canonicalRow.date}-${canonicalRow.round_type}`,
       `interview-${rowIndex + 1}`
     );
+    canonicalRow.calendar_source = canonicalRow.calendar_source || "sheet";
+    canonicalRow.status = canonicalRow.status || "tracked";
   }
 
   if (sheetName === "tasks") {
@@ -169,6 +193,7 @@ function canonicalizeRow(
 
   if (sheetName === "companies") {
     canonicalRow.next_step = canonicalRow.next_step || canonicalRow.status;
+    canonicalRow.status = canonicalRow.status || canonicalRow.priority;
   }
 
   if (sheetName === "skills") {
@@ -320,7 +345,6 @@ export async function readSheet(sheetName: SheetName): Promise<Record<string, st
     throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID");
   }
 
-  await ensureSpreadsheetStructure();
   const sheets = await getSheetsClient();
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
@@ -336,7 +360,6 @@ export async function readSheets(sheetNames: SheetName[]) {
     throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID");
   }
 
-  await ensureSpreadsheetStructure();
   const sheets = await getSheetsClient();
   const response = await sheets.spreadsheets.values.batchGet({
     spreadsheetId,

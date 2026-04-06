@@ -33,9 +33,13 @@ export interface RoundRow {
   date: string;
   time: string;
   status: string;
+  priority: string;
+  next_step: string;
   interviewer: string;
   format: string;
   notes: string;
+  is_latest_for_company: string;
+  is_next_upcoming: string;
 }
 
 export interface TaskRow {

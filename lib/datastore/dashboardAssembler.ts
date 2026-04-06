@@ -9,15 +9,32 @@ import type {
   PastItem,
   PriorityItem,
   ProgressMetric,
+  RoundRow,
   SkillMapItem,
   StorageSnapshot,
   SummaryStat,
   TaskRow,
-  InterviewRow,
   DailyPlanRow
 } from "@/lib/datastore/types";
 import { compareIsoDates, formatDateLabel, formatDateTimeLabel, getTodayIsoDate, humanNowLine, relativeUrgency } from "@/lib/utils/date";
 import { clampPercent, compactText, formatCountLabel } from "@/lib/utils/formatting";
+
+type PipelineEvent = {
+  company: string;
+  label: string;
+  date: string;
+  time: string;
+  status: string;
+  priority: string;
+  nextStep: string;
+  interviewer: string;
+  format: string;
+  meetingLink: string;
+  notes: string;
+  source: "round" | "interview";
+  isLatestForCompany: boolean;
+  isNextUpcoming: boolean;
+};
 
 function getPriorityRank(priority: string) {
   switch (priority.trim().toLowerCase()) {
@@ -44,6 +61,10 @@ function isInterviewTerminalStatus(status: string) {
   );
 }
 
+function isTruthyFlag(value: string) {
+  return ["true", "yes", "1", "y"].includes(value.trim().toLowerCase());
+}
+
 function isTodayOrFuture(date: string) {
   return Boolean(date) && date >= getTodayIsoDate();
 }
@@ -52,10 +73,93 @@ function isPastDate(date: string) {
   return Boolean(date) && date < getTodayIsoDate();
 }
 
-function getUpcomingInterviews(interviews: InterviewRow[]) {
-  return interviews
-    .filter((row) => isTodayOrFuture(row.date) && !isInterviewTerminalStatus(row.status))
-    .sort((left, right) => compareIsoDates(left.date, right.date));
+function getComparableEventDate(date: string) {
+  return date || "9999-12-31";
+}
+
+function comparePipelineEvents(left: PipelineEvent, right: PipelineEvent) {
+  return compareIsoDates(getComparableEventDate(left.date), getComparableEventDate(right.date));
+}
+
+function getRoundStatus(round: RoundRow) {
+  return round.status || round.priority;
+}
+
+function getPipelineEvents(snapshot: StorageSnapshot): PipelineEvent[] {
+  const seen = new Set<string>();
+  const events: PipelineEvent[] = [];
+
+  for (const round of snapshot.rounds) {
+    if (!round.company.trim() || !round.date.trim()) {
+      continue;
+    }
+
+    const label = compactText(round.round_name, "Round");
+    const status = compactText(getRoundStatus(round), "tracked");
+    const dedupeKey = `${round.company}::${round.date}::${label.toLowerCase()}::round`;
+
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+
+    seen.add(dedupeKey);
+    events.push({
+      company: round.company,
+      label,
+      date: round.date,
+      time: round.time,
+      status,
+      priority: round.priority,
+      nextStep: round.next_step,
+      interviewer: round.interviewer,
+      format: round.format,
+      meetingLink: "",
+      notes: round.notes,
+      source: "round",
+      isLatestForCompany: isTruthyFlag(round.is_latest_for_company),
+      isNextUpcoming: isTruthyFlag(round.is_next_upcoming)
+    });
+  }
+
+  for (const interview of snapshot.interviews) {
+    if (!interview.company.trim() || !interview.date.trim()) {
+      continue;
+    }
+
+    const label = compactText(interview.round_type, "Interview");
+    const dedupeKey = `${interview.company}::${interview.date}::${label.toLowerCase()}::interview`;
+    const roundKey = `${interview.company}::${interview.date}::${label.toLowerCase()}::round`;
+
+    if (seen.has(dedupeKey) || seen.has(roundKey)) {
+      continue;
+    }
+
+    seen.add(dedupeKey);
+    events.push({
+      company: interview.company,
+      label,
+      date: interview.date,
+      time: interview.start_time,
+      status: compactText(interview.status, "tracked"),
+      priority: "",
+      nextStep: "",
+      interviewer: interview.interviewer,
+      format: "",
+      meetingLink: interview.meeting_link,
+      notes: interview.notes,
+      source: "interview",
+      isLatestForCompany: false,
+      isNextUpcoming: false
+    });
+  }
+
+  return events.sort(comparePipelineEvents);
+}
+
+function getUpcomingEvents(events: PipelineEvent[]) {
+  return events
+    .filter((event) => isTodayOrFuture(event.date) && !isInterviewTerminalStatus(event.status))
+    .sort(comparePipelineEvents);
 }
 
 function getOpenDailyPlanRows(rows: DailyPlanRow[]) {
@@ -64,16 +168,20 @@ function getOpenDailyPlanRows(rows: DailyPlanRow[]) {
     .sort((left, right) => compareIsoDates(left.date || getTodayIsoDate(), right.date || getTodayIsoDate()));
 }
 
-function getInterviewDisplayStatus(row: InterviewRow) {
-  if (isPastDate(row.date) && !isInterviewTerminalStatus(row.status)) {
+function getFallbackTaskId(title: string) {
+  return `task-${title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`;
+}
+
+function getEventDisplayStatus(event: PipelineEvent) {
+  if (isPastDate(event.date) && !isInterviewTerminalStatus(event.status)) {
     return "past";
   }
 
-  return row.status;
+  return event.status;
 }
 
 function getInterviewCalendar(snapshot: StorageSnapshot): InterviewCalendarItem[] {
-  return [...snapshot.interviews]
+  return getPipelineEvents(snapshot)
     .sort((left, right) => {
       const leftUpcoming = isTodayOrFuture(left.date) && !isInterviewTerminalStatus(left.status) ? 0 : 1;
       const rightUpcoming = isTodayOrFuture(right.date) && !isInterviewTerminalStatus(right.status) ? 0 : 1;
@@ -82,17 +190,17 @@ function getInterviewCalendar(snapshot: StorageSnapshot): InterviewCalendarItem[
         return leftUpcoming - rightUpcoming;
       }
 
-      return compareIsoDates(left.date, right.date);
+      return comparePipelineEvents(left, right);
     })
-    .map((row) => ({
-      company: row.company,
-      roundType: row.round_type,
-      date: row.date,
-      dateLabel: formatDateLabel(row.date),
-      timeLabel: row.start_time ? `${row.start_time}${row.end_time ? ` - ${row.end_time}` : ""}` : "TBD",
-      status: getInterviewDisplayStatus(row),
-      interviewer: row.interviewer,
-      meetingLink: row.meeting_link
+    .map((event) => ({
+      company: event.company,
+      roundType: event.label,
+      date: event.date,
+      dateLabel: formatDateLabel(event.date),
+      timeLabel: event.time || "TBD",
+      status: getEventDisplayStatus(event),
+      interviewer: event.interviewer,
+      meetingLink: event.meetingLink
     }));
 }
 
@@ -101,8 +209,8 @@ function isClosedPipelineStatus(status: string) {
 }
 
 function getInterviewLane(
-  nextEvent: InterviewRow | undefined,
-  latestEvent: InterviewRow | undefined,
+  nextEvent: PipelineEvent | undefined,
+  latestEvent: PipelineEvent | undefined,
   companyStatus: string
 ): InterviewBoardCard["lane"] {
   if (nextEvent) {
@@ -139,28 +247,35 @@ function getLaneLabel(lane: InterviewBoardCard["lane"]) {
 
 function getInterviewBoard(snapshot: StorageSnapshot): InterviewBoardCard[] {
   const companiesByName = new Map(snapshot.companies.map((company) => [company.company, company]));
-  const interviewsByCompany = new Map<string, InterviewRow[]>();
+  const eventsByCompany = new Map<string, PipelineEvent[]>();
 
-  for (const interview of snapshot.interviews) {
-    const list = interviewsByCompany.get(interview.company) ?? [];
-    list.push(interview);
-    interviewsByCompany.set(interview.company, list);
+  for (const event of getPipelineEvents(snapshot)) {
+    const list = eventsByCompany.get(event.company) ?? [];
+    list.push(event);
+    eventsByCompany.set(event.company, list);
   }
 
-  return [...interviewsByCompany.entries()]
-    .map(([company, interviews]) => {
-      const ordered = [...interviews].sort((left, right) => compareIsoDates(left.date, right.date));
-      const past = ordered.filter((row) => isPastDate(row.date));
-      const upcoming = ordered.filter((row) => isTodayOrFuture(row.date) && !isInterviewTerminalStatus(row.status));
-      const latestEvent = ordered[ordered.length - 1];
-      const lastEvent = past[past.length - 1] || latestEvent;
-      const nextEvent = upcoming[0];
+  const companyNames = new Set<string>([
+    ...snapshot.companies.map((company) => company.company),
+    ...eventsByCompany.keys()
+  ]);
+
+  return [...companyNames]
+    .map((company) => {
+      const ordered = [...(eventsByCompany.get(company) ?? [])].sort(comparePipelineEvents);
+      const past = ordered.filter((event) => isPastDate(event.date));
+      const upcoming = ordered.filter((event) => isTodayOrFuture(event.date) && !isInterviewTerminalStatus(event.status));
+      const latestFlagged = ordered.find((event) => event.isLatestForCompany);
+      const nextFlagged = ordered.find((event) => event.isNextUpcoming);
+      const latestEvent = latestFlagged || ordered[ordered.length - 1];
+      const lastEvent = latestEvent && isPastDate(latestEvent.date) ? latestEvent : past[past.length - 1] || latestEvent;
+      const nextEvent = nextFlagged || upcoming[0];
       const companyRow = companiesByName.get(company);
       const lane = getInterviewLane(nextEvent, latestEvent, companyRow?.status || latestEvent?.status || "");
       const headline = nextEvent
-        ? `${nextEvent.round_type} next`
+        ? compactText(nextEvent.nextStep, `${nextEvent.label} next`)
         : lastEvent
-          ? `${lastEvent.round_type} was last touch`
+          ? `${lastEvent.label} was last touch`
           : compactText(companyRow?.status || "", "Pipeline tracked");
 
       return {
@@ -171,14 +286,17 @@ function getInterviewBoard(snapshot: StorageSnapshot): InterviewBoardCard[] {
         status: compactText(companyRow?.status || nextEvent?.status || latestEvent?.status || "", "tracked"),
         eventCount: ordered.length,
         lastEventDate: lastEvent?.date || "",
-        lastEventDateLabel: lastEvent ? formatDateTimeLabel(lastEvent.date, lastEvent.start_time) : "No past event",
-        lastEventLabel: lastEvent ? compactText(lastEvent.round_type, "Past event") : "No past event",
+        lastEventDateLabel: lastEvent ? formatDateTimeLabel(lastEvent.date, lastEvent.time) : "No past event",
+        lastEventLabel: lastEvent ? compactText(lastEvent.label, "Past event") : "No past event",
         nextEventDate: nextEvent?.date || "",
-        nextEventDateLabel: nextEvent ? formatDateTimeLabel(nextEvent.date, nextEvent.start_time) : "No next date",
-        nextEventLabel: nextEvent ? compactText(nextEvent.round_type, "Upcoming") : compactText(companyRow?.next_step || "", "No next date"),
+        nextEventDateLabel: nextEvent ? formatDateTimeLabel(nextEvent.date, nextEvent.time) : "No next date",
+        nextEventLabel: nextEvent ? compactText(nextEvent.label, "Upcoming") : compactText(companyRow?.next_step || "", "No next date"),
         interviewer: compactText(nextEvent?.interviewer || latestEvent?.interviewer || "", "Interviewer TBD"),
-        meetingLink: nextEvent?.meeting_link || latestEvent?.meeting_link || "",
-        notes: compactText(nextEvent?.notes || latestEvent?.notes || companyRow?.notes || "", "No notes logged")
+        meetingLink: nextEvent?.meetingLink || latestEvent?.meetingLink || "",
+        notes: compactText(
+          nextEvent?.notes || nextEvent?.nextStep || latestEvent?.notes || latestEvent?.nextStep || companyRow?.notes || "",
+          "No notes logged"
+        )
       };
     })
     .sort((left, right) => {
@@ -246,10 +364,15 @@ function getPriorities(snapshot: StorageSnapshot): PriorityItem[] {
 }
 
 function getBattlePlan(snapshot: StorageSnapshot): BattlePlanItem[] {
-  const taskMap = new Map(snapshot.tasks.map((task) => [task.task_id, task]));
+  const taskMap = new Map(
+    snapshot.tasks.flatMap((task) => [
+      [task.task_id, task] as const,
+      [getFallbackTaskId(task.task), task] as const
+    ])
+  );
   const prioritizedPlan = getOpenDailyPlanRows(snapshot.dailyPlan)
     .map((row) => {
-      const task = taskMap.get(row.task_id);
+      const task = taskMap.get(row.task_id) || taskMap.get(getFallbackTaskId(row.task_id));
       return {
         id: row.task_id,
         slot: row.slot,
@@ -279,7 +402,11 @@ function getCompanyIntel(snapshot: StorageSnapshot): CompanyIntelCard[] {
   const roundsByCompany = new Map<string, string[]>();
   for (const round of snapshot.rounds) {
     const list = roundsByCompany.get(round.company) ?? [];
-    list.push(`${round.round_name} · ${formatDateTimeLabel(round.date, round.time)} · ${round.status}`);
+    list.push(
+      `${compactText(round.round_name, "Round")} · ${formatDateTimeLabel(round.date, round.time)} · ${compactText(getRoundStatus(round), "tracked")}${
+        round.next_step ? ` · Next: ${round.next_step}` : ""
+      }`
+    );
     roundsByCompany.set(round.company, list);
   }
 
@@ -292,20 +419,31 @@ function getCompanyIntel(snapshot: StorageSnapshot): CompanyIntelCard[] {
 
   const notesByCompany = new Map(snapshot.recruiterNotes.map((note) => [note.company, note]));
 
-  return snapshot.companies.map((company) => {
-    const recruiterNote = notesByCompany.get(company.company);
-    const status = compactText(company.status, "Unknown");
+  const companiesByName = new Map(snapshot.companies.map((company) => [company.company, company]));
+  const companyNames = new Set<string>([
+    ...snapshot.companies.map((company) => company.company),
+    ...snapshot.rounds.map((round) => round.company).filter(Boolean),
+    ...snapshot.interviews.map((interview) => interview.company).filter(Boolean)
+  ]);
+
+  return [...companyNames].map((companyName) => {
+    const company = companiesByName.get(companyName);
+    const fallbackStatus = [...snapshot.rounds]
+      .filter((round) => round.company === companyName)
+      .sort((left, right) => compareIsoDates(right.date, left.date))[0];
+    const recruiterNote = notesByCompany.get(companyName);
+    const status = compactText(company?.status || fallbackStatus?.status || fallbackStatus?.priority || "", "Unknown");
     return {
-      company: company.company,
-      sponsorship: compactText(company.h1b_sponsorship, "Unknown"),
-      interviewProcess: roundsByCompany.get(company.company) ?? [`Current stage: ${status}`],
-      focusAreas: gapsByCompany.get(company.company) ?? [compactText(company.notes, "No specific focus area yet.")],
-      tip: recruiterNote?.notes || compactText(company.next_step, compactText(company.notes, "Keep this pipeline warm.")),
-      yourAngle: compactText(company.notes, "Frame the strongest operator story for this company."),
-      compensation: compactText(company.salary_band, "Not tracked"),
-      targetLevel: compactText(company.target_level, "Not set"),
-      nextStep: compactText(company.next_step, status),
-      recruiter: compactText(company.recruiter, "Not assigned"),
+      company: companyName,
+      sponsorship: compactText(company?.h1b_sponsorship || "", "Unknown"),
+      interviewProcess: roundsByCompany.get(companyName) ?? [`Current stage: ${status}`],
+      focusAreas: gapsByCompany.get(companyName) ?? [compactText(company?.notes || fallbackStatus?.notes || "", "No specific focus area yet.")],
+      tip: recruiterNote?.notes || compactText(company?.next_step || fallbackStatus?.next_step || "", compactText(company?.notes || fallbackStatus?.notes || "", "Keep this pipeline warm.")),
+      yourAngle: compactText(company?.notes || fallbackStatus?.notes || "", "Frame the strongest operator story for this company."),
+      compensation: compactText(company?.salary_band || "", "Not tracked"),
+      targetLevel: compactText(company?.target_level || "", "Not set"),
+      nextStep: compactText(company?.next_step || fallbackStatus?.next_step || "", status),
+      recruiter: compactText(company?.recruiter || "", "Not assigned"),
       status
     };
   });
@@ -350,23 +488,23 @@ function getWeeklyProgress(snapshot: StorageSnapshot): ProgressMetric[] {
 }
 
 function getTopStats(snapshot: StorageSnapshot, priorities: PriorityItem[]): SummaryStat[] {
-  const upcomingInterviews = getUpcomingInterviews(snapshot.interviews);
-  const nextInterview = upcomingInterviews[0];
-  const weekCount = upcomingInterviews.filter((row) => {
-    const diff = new Date(row.date).getTime() - new Date(getTodayIsoDate()).getTime();
+  const upcomingEvents = getUpcomingEvents(getPipelineEvents(snapshot));
+  const nextInterview = upcomingEvents[0];
+  const weekCount = upcomingEvents.filter((event) => {
+    const diff = new Date(event.date).getTime() - new Date(getTodayIsoDate()).getTime();
     return diff >= 0 && diff <= 7 * 86_400_000;
   }).length;
 
   return [
     {
       label: "Next Interview",
-      value: nextInterview ? `${nextInterview.company} · ${nextInterview.round_type}` : "No interview set",
-      detail: nextInterview ? formatDateTimeLabel(nextInterview.date, nextInterview.start_time) : "Add rows in the interviews sheet to populate this board"
+      value: nextInterview ? `${nextInterview.company} · ${nextInterview.label}` : "No interview set",
+      detail: nextInterview ? formatDateTimeLabel(nextInterview.date, nextInterview.time) : "Add rows in the rounds sheet to populate this board"
     },
     {
       label: "This Week",
       value: formatCountLabel(weekCount, "loop"),
-      detail: `${upcomingInterviews.length} upcoming interview events on the board`
+      detail: `${upcomingEvents.length} upcoming interview events on the board`
     },
     {
       label: "Urgent Item",
@@ -408,38 +546,26 @@ function getMentorFocus(snapshot: StorageSnapshot, priorities: PriorityItem[], s
 }
 
 function getResources(snapshot: StorageSnapshot) {
-  return snapshot.companies.slice(0, 3).map((company) => ({
+  const cards = getCompanyIntel(snapshot);
+  return cards.slice(0, 3).map((company) => ({
     title: company.company,
-    subtitle: compactText(company.recruiter, compactText(company.status, "No recruiter")),
-    body: compactText(company.notes, compactText(company.next_step, "No notes yet"))
+    subtitle: compactText(company.recruiter, company.status),
+    body: compactText(company.tip, company.nextStep)
   }));
 }
 
 function getPastItems(snapshot: StorageSnapshot): PastItem[] {
-  const pastInterviews: PastItem[] = snapshot.interviews
-    .filter((row) => isPastDate(row.date))
-    .map((row) => ({
-      id: `interview-${row.event_id || `${row.company}-${row.date}-${row.round_type}`}`,
-      kind: "interview",
-      title: `${row.company} · ${row.round_type}`,
-      company: row.company,
-      date: row.date,
-      dateLabel: formatDateTimeLabel(row.date, row.start_time),
-      detail: compactText(row.notes, row.interviewer || "Past interview"),
-      status: getInterviewDisplayStatus(row)
-    }));
-
-  const pastRounds: PastItem[] = snapshot.rounds
-    .filter((row) => isPastDate(row.date))
-    .map((row, index) => ({
-      id: `round-${row.company}-${row.date}-${row.round_name}-${index}`,
-      kind: "round",
-      title: `${row.company} · ${row.round_name}`,
-      company: row.company,
-      date: row.date,
-      dateLabel: formatDateTimeLabel(row.date, row.time),
-      detail: compactText(row.notes, row.interviewer || "Past round"),
-      status: row.status
+  const pastEvents: PastItem[] = getPipelineEvents(snapshot)
+    .filter((event) => isPastDate(event.date))
+    .map((event, index) => ({
+      id: `${event.source}-${event.company}-${event.date}-${event.label}-${index}`,
+      kind: event.source === "round" ? "round" : "interview",
+      title: `${event.company} · ${event.label}`,
+      company: event.company,
+      date: event.date,
+      dateLabel: formatDateTimeLabel(event.date, event.time),
+      detail: compactText(event.notes || event.nextStep, event.interviewer || "Past event"),
+      status: getEventDisplayStatus(event)
     }));
 
   const pastTasks: PastItem[] = snapshot.tasks
@@ -472,7 +598,7 @@ function getPastItems(snapshot: StorageSnapshot): PastItem[] {
       };
     });
 
-  return [...pastInterviews, ...pastRounds, ...pastTasks, ...pastPlans]
+  return [...pastEvents, ...pastTasks, ...pastPlans]
     .sort((left, right) => compareIsoDates(right.date, left.date));
 }
 
@@ -495,7 +621,11 @@ export function assembleDashboardPayload(
     lastSyncedAt: summaryMap.get("last_sync_at") || snapshot.syncLog[0]?.timestamp || "Never",
     lastSyncStatus: summaryMap.get("last_sync_status") || "ready",
     syncMessage: summaryMap.get("sync_message") || summaryMap.get("battle_plan_headline") || "System ready for sync.",
-    activePipelines: new Set(snapshot.interviews.map((row) => row.company)).size,
+    activePipelines: new Set([
+      ...snapshot.interviews.map((row) => row.company),
+      ...snapshot.rounds.map((row) => row.company),
+      ...snapshot.companies.map((row) => row.company)
+    ].filter(Boolean)).size,
     topStats: getTopStats(snapshot, priorities),
     battlePlan,
     mentorFocus: getMentorFocus(snapshot, priorities, skillMap),

@@ -54,9 +54,13 @@ export const roundRowSchema = z.object({
   date: stringField,
   time: stringField,
   status: stringField,
+  priority: stringField,
+  next_step: stringField,
   interviewer: stringField,
   format: stringField,
-  notes: stringField
+  notes: stringField,
+  is_latest_for_company: stringField,
+  is_next_upcoming: stringField
 }) as z.ZodType<RoundRow>;
 
 export const taskRowSchema = z.object({
