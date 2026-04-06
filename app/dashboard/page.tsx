@@ -30,6 +30,7 @@ const emptyDashboard: DashboardPayload = {
   weeklyProgress: [],
   priorities: [],
   interviewCalendar: [],
+  interviewBoard: [],
   skillMap: [],
   codingTracker: [],
   resources: [],
@@ -112,12 +113,40 @@ function DashboardContent({
   }
 
   if (activeTab === "Interview Calendar") {
-    const calendarItems = dashboard.interviewCalendar;
+    const lanes = [
+      {
+        key: "needs_action",
+        label: "Needs Action",
+        tone: "border-[#d67658]/40 bg-[#241514]"
+      },
+      {
+        key: "upcoming",
+        label: "Upcoming",
+        tone: "border-[#6c8fbe]/35 bg-[#111925]"
+      },
+      {
+        key: "watching",
+        label: "Watching",
+        tone: "border-[#8c7b54]/35 bg-[#1d1911]"
+      },
+      {
+        key: "closed",
+        label: "Closed",
+        tone: "border-[#4f4f4f]/45 bg-[#191919]"
+      }
+    ] as const;
+
     return (
       <section className="panel p-6">
-        <p className="text-xs uppercase tracking-[0.24em] text-muted">Interview Calendar</p>
-        <div className="mt-5 space-y-3">
-          {calendarItems.length === 0 ? (
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-muted">Interview Calendar</p>
+            <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em]">Kanban by pipeline momentum</h2>
+          </div>
+          <span className="text-sm text-muted">{dashboard.interviewBoard.length} pipelines</span>
+        </div>
+        <div className="mt-6">
+          {dashboard.interviewBoard.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-border bg-black/10 p-5">
               <p className="text-sm text-text">No interview events found.</p>
               <p className="mt-2 text-sm leading-6 text-muted">
@@ -125,17 +154,68 @@ function DashboardContent({
               </p>
             </div>
           ) : null}
-          {calendarItems.map((item) => (
-            <article key={`${item.company}-${item.dateLabel}-${item.roundType}`} className="rounded-3xl border border-border/80 bg-black/10 p-4">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h3 className="text-lg font-medium">{item.company}</h3>
-                  <p className="text-sm text-muted">{item.roundType} · {item.interviewer || "Interviewer TBD"}</p>
+          <div className="grid gap-4 xl:grid-cols-4">
+            {lanes.map((lane) => {
+              const cards = dashboard.interviewBoard.filter((card) => card.lane === lane.key);
+              return (
+                <div key={lane.key} className={`rounded-[28px] border p-4 ${lane.tone}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.22em] text-muted">{lane.label}</p>
+                      <p className="mt-1 text-sm text-muted">{cards.length} cards</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {cards.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-border/70 bg-black/10 p-4 text-sm text-muted">
+                        No pipelines in this lane.
+                      </div>
+                    ) : null}
+                    {cards.map((card) => (
+                      <article key={`${card.company}-${card.lastEventDate}-${card.nextEventDate}`} className="rounded-[24px] border border-border/80 bg-[#0f0f0f]/70 p-4 shadow-[0_12px_24px_rgba(0,0,0,0.18)]">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-lg font-medium">{card.company}</h3>
+                            <p className="mt-1 text-sm text-muted">{card.headline}</p>
+                          </div>
+                          <span className="rounded-full border border-border/70 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-muted">
+                            {card.status}
+                          </span>
+                        </div>
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          <div className="rounded-2xl border border-border/70 bg-black/10 p-3">
+                            <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Last Event Date</p>
+                            <p className="mt-2 text-sm font-medium text-text">{card.lastEventDateLabel}</p>
+                            <p className="mt-1 text-sm text-muted">{card.lastEventLabel}</p>
+                          </div>
+                          <div className="rounded-2xl border border-border/70 bg-black/10 p-3">
+                            <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Next Date To Note</p>
+                            <p className="mt-2 text-sm font-medium text-text">{card.nextEventDateLabel}</p>
+                            <p className="mt-1 text-sm text-muted">{card.nextEventLabel}</p>
+                          </div>
+                        </div>
+                        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted">
+                          <span>{card.eventCount} events</span>
+                          <span>{card.interviewer}</span>
+                          {card.meetingLink ? (
+                            <a
+                              href={card.meetingLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[#d8d0c4] underline-offset-4 hover:underline"
+                            >
+                              Open link
+                            </a>
+                          ) : null}
+                        </div>
+                        <p className="mt-4 text-sm leading-6 text-muted">{card.notes}</p>
+                      </article>
+                    ))}
+                  </div>
                 </div>
-                <div className="text-sm text-muted">{item.dateLabel} · {item.timeLabel}</div>
-              </div>
-            </article>
-          ))}
+              );
+            })}
+          </div>
         </div>
       </section>
     );

@@ -4,6 +4,7 @@ import type {
   ConfigStatus,
   DashboardPayload,
   DashboardSummaryRow,
+  InterviewBoardCard,
   InterviewCalendarItem,
   PastItem,
   PriorityItem,
@@ -86,12 +87,113 @@ function getInterviewCalendar(snapshot: StorageSnapshot): InterviewCalendarItem[
     .map((row) => ({
       company: row.company,
       roundType: row.round_type,
+      date: row.date,
       dateLabel: formatDateLabel(row.date),
       timeLabel: row.start_time ? `${row.start_time}${row.end_time ? ` - ${row.end_time}` : ""}` : "TBD",
       status: getInterviewDisplayStatus(row),
       interviewer: row.interviewer,
       meetingLink: row.meeting_link
     }));
+}
+
+function isClosedPipelineStatus(status: string) {
+  return ["ghosted", "rejected", "declined", "closed", "complete", "completed"].includes(status.trim().toLowerCase());
+}
+
+function getInterviewLane(
+  nextEvent: InterviewRow | undefined,
+  latestEvent: InterviewRow | undefined,
+  companyStatus: string
+): InterviewBoardCard["lane"] {
+  if (nextEvent) {
+    const daysUntil = Math.ceil(
+      (new Date(nextEvent.date).getTime() - new Date(getTodayIsoDate()).getTime()) / 86_400_000
+    );
+
+    if (daysUntil <= 1) {
+      return "needs_action";
+    }
+
+    return "upcoming";
+  }
+
+  if (isClosedPipelineStatus(companyStatus) || (latestEvent && isInterviewTerminalStatus(latestEvent.status))) {
+    return "closed";
+  }
+
+  return "watching";
+}
+
+function getLaneLabel(lane: InterviewBoardCard["lane"]) {
+  switch (lane) {
+    case "needs_action":
+      return "Needs Action";
+    case "upcoming":
+      return "Upcoming";
+    case "watching":
+      return "Watching";
+    case "closed":
+      return "Closed";
+  }
+}
+
+function getInterviewBoard(snapshot: StorageSnapshot): InterviewBoardCard[] {
+  const companiesByName = new Map(snapshot.companies.map((company) => [company.company, company]));
+  const interviewsByCompany = new Map<string, InterviewRow[]>();
+
+  for (const interview of snapshot.interviews) {
+    const list = interviewsByCompany.get(interview.company) ?? [];
+    list.push(interview);
+    interviewsByCompany.set(interview.company, list);
+  }
+
+  return [...interviewsByCompany.entries()]
+    .map(([company, interviews]) => {
+      const ordered = [...interviews].sort((left, right) => compareIsoDates(left.date, right.date));
+      const past = ordered.filter((row) => isPastDate(row.date));
+      const upcoming = ordered.filter((row) => isTodayOrFuture(row.date) && !isInterviewTerminalStatus(row.status));
+      const latestEvent = ordered[ordered.length - 1];
+      const lastEvent = past[past.length - 1] || latestEvent;
+      const nextEvent = upcoming[0];
+      const companyRow = companiesByName.get(company);
+      const lane = getInterviewLane(nextEvent, latestEvent, companyRow?.status || latestEvent?.status || "");
+      const headline = nextEvent
+        ? `${nextEvent.round_type} next`
+        : lastEvent
+          ? `${lastEvent.round_type} was last touch`
+          : compactText(companyRow?.status || "", "Pipeline tracked");
+
+      return {
+        company,
+        lane,
+        laneLabel: getLaneLabel(lane),
+        headline,
+        status: compactText(companyRow?.status || nextEvent?.status || latestEvent?.status || "", "tracked"),
+        eventCount: ordered.length,
+        lastEventDate: lastEvent?.date || "",
+        lastEventDateLabel: lastEvent ? formatDateTimeLabel(lastEvent.date, lastEvent.start_time) : "No past event",
+        lastEventLabel: lastEvent ? compactText(lastEvent.round_type, "Past event") : "No past event",
+        nextEventDate: nextEvent?.date || "",
+        nextEventDateLabel: nextEvent ? formatDateTimeLabel(nextEvent.date, nextEvent.start_time) : "No next date",
+        nextEventLabel: nextEvent ? compactText(nextEvent.round_type, "Upcoming") : compactText(companyRow?.next_step || "", "No next date"),
+        interviewer: compactText(nextEvent?.interviewer || latestEvent?.interviewer || "", "Interviewer TBD"),
+        meetingLink: nextEvent?.meeting_link || latestEvent?.meeting_link || "",
+        notes: compactText(nextEvent?.notes || latestEvent?.notes || companyRow?.notes || "", "No notes logged")
+      };
+    })
+    .sort((left, right) => {
+      const laneOrder = ["needs_action", "upcoming", "watching", "closed"];
+      const leftLane = laneOrder.indexOf(left.lane);
+      const rightLane = laneOrder.indexOf(right.lane);
+
+      if (leftLane !== rightLane) {
+        return leftLane - rightLane;
+      }
+
+      const leftDate = left.nextEventDate || left.lastEventDate;
+      const rightDate = right.nextEventDate || right.lastEventDate;
+      return compareIsoDates(leftDate || "9999-12-31", rightDate || "9999-12-31");
+    });
 }
 
 function scoreTask(task: TaskRow) {
@@ -378,6 +480,7 @@ export function assembleDashboardPayload(
     weeklyProgress,
     priorities,
     interviewCalendar: getInterviewCalendar(snapshot),
+    interviewBoard: getInterviewBoard(snapshot),
     skillMap,
     codingTracker: snapshot.tasks.filter((task) =>
       ["coding", "technical", "algorithm"].some((keyword) =>

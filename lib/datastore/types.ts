@@ -186,11 +186,30 @@ export interface PriorityItem {
 export interface InterviewCalendarItem {
   company: string;
   roundType: string;
+  date: string;
   dateLabel: string;
   timeLabel: string;
   status: string;
   interviewer: string;
   meetingLink: string;
+}
+
+export interface InterviewBoardCard {
+  company: string;
+  lane: "needs_action" | "upcoming" | "watching" | "closed";
+  laneLabel: string;
+  headline: string;
+  status: string;
+  eventCount: number;
+  lastEventDate: string;
+  lastEventDateLabel: string;
+  lastEventLabel: string;
+  nextEventDate: string;
+  nextEventDateLabel: string;
+  nextEventLabel: string;
+  interviewer: string;
+  meetingLink: string;
+  notes: string;
 }
 
 export interface SkillMapItem {
@@ -238,6 +257,7 @@ export interface DashboardPayload {
   weeklyProgress: ProgressMetric[];
   priorities: PriorityItem[];
   interviewCalendar: InterviewCalendarItem[];
+  interviewBoard: InterviewBoardCard[];
   skillMap: SkillMapItem[];
   codingTracker: TaskRow[];
   resources: ResourceItem[];
