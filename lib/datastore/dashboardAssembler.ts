@@ -5,6 +5,7 @@ import type {
   DashboardPayload,
   DashboardSummaryRow,
   InterviewCalendarItem,
+  PastItem,
   PriorityItem,
   ProgressMetric,
   SkillMapItem,
@@ -289,6 +290,67 @@ function getResources(snapshot: StorageSnapshot) {
   }));
 }
 
+function getPastItems(snapshot: StorageSnapshot): PastItem[] {
+  const pastInterviews: PastItem[] = snapshot.interviews
+    .filter((row) => isPastDate(row.date))
+    .map((row) => ({
+      id: `interview-${row.event_id || `${row.company}-${row.date}-${row.round_type}`}`,
+      kind: "interview",
+      title: `${row.company} · ${row.round_type}`,
+      company: row.company,
+      date: row.date,
+      dateLabel: formatDateTimeLabel(row.date, row.start_time),
+      detail: compactText(row.notes, row.interviewer || "Past interview"),
+      status: getInterviewDisplayStatus(row)
+    }));
+
+  const pastRounds: PastItem[] = snapshot.rounds
+    .filter((row) => isPastDate(row.date))
+    .map((row, index) => ({
+      id: `round-${row.company}-${row.date}-${row.round_name}-${index}`,
+      kind: "round",
+      title: `${row.company} · ${row.round_name}`,
+      company: row.company,
+      date: row.date,
+      dateLabel: formatDateTimeLabel(row.date, row.time),
+      detail: compactText(row.notes, row.interviewer || "Past round"),
+      status: row.status
+    }));
+
+  const pastTasks: PastItem[] = snapshot.tasks
+    .filter((task) => isPastDate(task.due_date))
+    .map((task) => ({
+      id: `task-${task.task_id}`,
+      kind: "task",
+      title: task.task,
+      company: compactText(task.company, "General"),
+      date: task.due_date,
+      dateLabel: formatDateLabel(task.due_date),
+      detail: compactText(task.notes, `${task.category} task`),
+      status: task.status
+    }));
+
+  const taskMap = new Map(snapshot.tasks.map((task) => [task.task_id, task]));
+  const pastPlans: PastItem[] = snapshot.dailyPlan
+    .filter((row) => isPastDate(row.date))
+    .map((row, index) => {
+      const task = taskMap.get(row.task_id);
+      return {
+        id: `plan-${row.task_id || index}-${row.date}`,
+        kind: "plan",
+        title: task?.task || compactText(row.focus_area, "Daily plan item"),
+        company: compactText(task?.company || "", "General"),
+        date: row.date,
+        dateLabel: formatDateLabel(row.date),
+        detail: compactText(row.notes, row.slot || "Past daily plan slot"),
+        status: row.priority
+      };
+    });
+
+  return [...pastInterviews, ...pastRounds, ...pastTasks, ...pastPlans]
+    .sort((left, right) => compareIsoDates(right.date, left.date));
+}
+
 function getSummaryRowMap(rows: DashboardSummaryRow[]) {
   return new Map(rows.map((row) => [row.key, row.value]));
 }
@@ -323,6 +385,7 @@ export function assembleDashboardPayload(
       )
     ),
     resources: getResources(snapshot),
+    pastItems: getPastItems(snapshot),
     weakestArea: skillMap.sort((left, right) => left.progressPercent - right.progressPercent)[0]?.skill || "Unknown",
     configStatus: configStatus ?? {
       healthy: true,

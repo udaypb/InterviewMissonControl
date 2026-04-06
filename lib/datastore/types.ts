@@ -207,6 +207,17 @@ export interface ResourceItem {
   body: string;
 }
 
+export interface PastItem {
+  id: string;
+  kind: "interview" | "round" | "task" | "plan";
+  title: string;
+  company: string;
+  date: string;
+  dateLabel: string;
+  detail: string;
+  status: string;
+}
+
 export interface ConfigStatus {
   healthy: boolean;
   label: string;
@@ -230,6 +241,7 @@ export interface DashboardPayload {
   skillMap: SkillMapItem[];
   codingTracker: TaskRow[];
   resources: ResourceItem[];
+  pastItems: PastItem[];
   weakestArea: string;
   configStatus: ConfigStatus;
 }

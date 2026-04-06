@@ -134,6 +134,7 @@ export function buildFallbackDashboardPayload(message: string): DashboardPayload
     skillMap: [],
     codingTracker: [],
     resources: [],
+    pastItems: [],
     weakestArea: "Unknown",
     configStatus
   };

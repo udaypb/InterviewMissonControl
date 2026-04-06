@@ -33,6 +33,7 @@ const emptyDashboard: DashboardPayload = {
   skillMap: [],
   codingTracker: [],
   resources: [],
+  pastItems: [],
   weakestArea: "Unknown",
   configStatus: {
     healthy: false,
@@ -133,6 +134,43 @@ function DashboardContent({
                 </div>
                 <div className="text-sm text-muted">{item.dateLabel} · {item.timeLabel}</div>
               </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (activeTab === "Past") {
+    return (
+      <section className="panel p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-muted">Past</p>
+            <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em]">Past interviews, rounds, and expired tasks</h2>
+          </div>
+          <span className="text-sm text-muted">{dashboard.pastItems.length} items</span>
+        </div>
+        <div className="mt-6 space-y-3">
+          {dashboard.pastItems.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-border bg-black/10 p-5">
+              <p className="text-sm text-text">No past-dated items found.</p>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                Once dates in the sheet fall behind today, they will appear here automatically.
+              </p>
+            </div>
+          ) : null}
+          {dashboard.pastItems.map((item) => (
+            <article key={item.id} className="rounded-3xl border border-border/80 bg-black/10 p-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted">{item.kind}</p>
+                  <h3 className="mt-1 text-lg font-medium">{item.title}</h3>
+                  <p className="text-sm text-muted">{item.company} · {item.status || "logged"}</p>
+                </div>
+                <div className="text-sm text-muted">{item.dateLabel}</div>
+              </div>
+              <p className="mt-3 text-sm text-muted">{item.detail}</p>
             </article>
           ))}
         </div>
