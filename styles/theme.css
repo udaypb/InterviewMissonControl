@@ -1,0 +1,17 @@
+:root {
+  --canvas: #1f1f1f;
+  --panel: #252525;
+  --panel-alt: #2b2b2b;
+  --border: #3a3a3a;
+  --text: #f3f0ea;
+  --muted: #cfc7bf;
+  --purple-accent: #9a8dff;
+  --purple-fill: rgba(154, 141, 255, 0.14);
+  --green-accent: #8fd1ac;
+  --green-fill: rgba(143, 209, 172, 0.14);
+  --amber-accent: #f3c874;
+  --amber-fill: rgba(243, 200, 116, 0.14);
+  --track: #313131;
+  --danger: #e3786a;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+}
