@@ -132,6 +132,7 @@ export function buildFallbackDashboardPayload(message: string): DashboardPayload
     priorities: [],
     interviewCalendar: [],
     interviewBoard: [],
+    todoItems: [],
     skillMap: [],
     codingTracker: [],
     resources: [],

@@ -258,6 +258,7 @@ export interface DashboardPayload {
   priorities: PriorityItem[];
   interviewCalendar: InterviewCalendarItem[];
   interviewBoard: InterviewBoardCard[];
+  todoItems: TaskRow[];
   skillMap: SkillMapItem[];
   codingTracker: TaskRow[];
   resources: ResourceItem[];

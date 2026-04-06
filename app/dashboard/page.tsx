@@ -10,6 +10,7 @@ import { MobileSummary } from "@/components/MobileSummary";
 import { ProgressPanel } from "@/components/ProgressPanel";
 import { StatusBar } from "@/components/StatusBar";
 import { Tabs, type DashboardTab } from "@/components/Tabs";
+import { TodoDock } from "@/components/TodoDock";
 import { TopStats } from "@/components/TopStats";
 import type {
   DashboardPayload,
@@ -30,6 +31,7 @@ const emptyDashboard: DashboardPayload = {
   priorities: [],
   interviewCalendar: [],
   interviewBoard: [],
+  todoItems: [],
   skillMap: [],
   codingTracker: [],
   resources: [],
@@ -94,14 +96,18 @@ function DashboardContent({
       <>
         <TopStats stats={dashboard.topStats} />
         <div className="hidden lg:block">
-          <div className="grid gap-5 xl:grid-cols-2">
+          <div className="grid gap-5 xl:grid-cols-[1.25fr_0.95fr]">
+            <TodoDock tasks={dashboard.todoItems} compact />
             <BattlePlan items={dashboard.battlePlan} />
+          </div>
+          <div className="mt-5 grid gap-5 xl:grid-cols-2">
             <MentorFocus cards={dashboard.mentorFocus} />
             <CompanyIntel companies={dashboard.companyIntel} />
             <ProgressPanel metrics={dashboard.weeklyProgress} onOpenSkillMap={onOpenSkillMap} />
           </div>
         </div>
         <div className="grid gap-5 lg:hidden">
+          <TodoDock tasks={dashboard.todoItems} compact />
           <BattlePlan items={dashboard.battlePlan} />
           <MentorFocus cards={dashboard.mentorFocus} />
           <CompanyIntel companies={dashboard.companyIntel} />
@@ -109,6 +115,10 @@ function DashboardContent({
         </div>
       </>
     );
+  }
+
+  if (activeTab === "Todo") {
+    return <TodoDock tasks={dashboard.todoItems} />;
   }
 
   if (activeTab === "Interview Calendar") {
@@ -134,6 +144,10 @@ function DashboardContent({
         tone: "border-[#4f4f4f]/45 bg-[#191919]"
       }
     ] as const;
+    const laneCounts = lanes.map((lane) => ({
+      ...lane,
+      count: dashboard.interviewBoard.filter((card) => card.lane === lane.key).length
+    }));
     const pastEventCards = dashboard.pastItems
       .filter((item) => item.kind === "interview" || item.kind === "round")
       .slice(0, 8);
@@ -156,11 +170,33 @@ function DashboardContent({
               </p>
             </div>
           ) : null}
-          <div className="grid gap-4 xl:grid-cols-4">
+          <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {laneCounts.map((lane) => (
+              <div
+                key={lane.key}
+                className={`rounded-[24px] border px-4 py-4 shadow-[0_10px_20px_rgba(0,0,0,0.16)] ${lane.tone}`}
+              >
+                <p className="text-[11px] uppercase tracking-[0.22em] text-muted">{lane.label}</p>
+                <div className="mt-3 flex items-end justify-between gap-3">
+                  <span className="text-3xl font-semibold tracking-[-0.04em] text-text">{lane.count}</span>
+                  <span className="text-sm text-muted">
+                    {lane.key === "needs_action"
+                      ? "Immediate prep"
+                      : lane.key === "upcoming"
+                        ? "Future loops"
+                        : lane.key === "watching"
+                          ? "Waiting state"
+                          : "Finished lanes"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
             {lanes.map((lane) => {
               const cards = dashboard.interviewBoard.filter((card) => card.lane === lane.key);
               return (
-                <div key={lane.key} className={`rounded-[28px] border p-4 ${lane.tone}`}>
+                <div key={lane.key} className={`rounded-[28px] border p-4 shadow-[0_16px_32px_rgba(0,0,0,0.18)] ${lane.tone}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs uppercase tracking-[0.22em] text-muted">{lane.label}</p>
@@ -184,16 +220,23 @@ function DashboardContent({
                             {card.status}
                           </span>
                         </div>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                          <div className="rounded-2xl border border-border/70 bg-black/10 p-3">
-                            <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Last Event Date</p>
-                            <p className="mt-2 text-sm font-medium text-text">{card.lastEventDateLabel}</p>
-                            <p className="mt-1 text-sm text-muted">{card.lastEventLabel}</p>
-                          </div>
-                          <div className="rounded-2xl border border-border/70 bg-black/10 p-3">
-                            <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Next Date To Note</p>
-                            <p className="mt-2 text-sm font-medium text-text">{card.nextEventDateLabel}</p>
-                            <p className="mt-1 text-sm text-muted">{card.nextEventLabel}</p>
+                        <div className="mt-4 rounded-[22px] border border-border/70 bg-black/10 p-3">
+                          <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-4">
+                            <div className="mt-1 h-3 w-3 rounded-full bg-[#d1a86b]" />
+                            <div>
+                              <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Last Event Date</p>
+                              <p className="mt-2 text-sm font-medium text-text">{card.lastEventDateLabel}</p>
+                              <p className="mt-1 text-sm text-muted">{card.lastEventLabel}</p>
+                            </div>
+                            <div className="relative mt-1 flex h-full justify-center">
+                              <span className="absolute inset-y-0 w-px bg-border/70" />
+                              <span className="relative mt-7 h-3 w-3 rounded-full bg-[#79a5ea]" />
+                            </div>
+                            <div>
+                              <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Next Date To Note</p>
+                              <p className="mt-2 text-sm font-medium text-text">{card.nextEventDateLabel}</p>
+                              <p className="mt-1 text-sm text-muted">{card.nextEventLabel}</p>
+                            </div>
                           </div>
                         </div>
                         <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted">

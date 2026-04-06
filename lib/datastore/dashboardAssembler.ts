@@ -206,6 +206,29 @@ function scoreTask(task: TaskRow) {
   return priorityWeight + Math.max(0, 10 - dueDays) * 4 + statusPenalty;
 }
 
+function compareTaskTiming(left: TaskRow, right: TaskRow) {
+  const leftDone = isCompletedStatus(left.status) ? 1 : 0;
+  const rightDone = isCompletedStatus(right.status) ? 1 : 0;
+
+  if (leftDone !== rightDone) {
+    return leftDone - rightDone;
+  }
+
+  const leftDue = left.due_date || "9999-12-31";
+  const rightDue = right.due_date || "9999-12-31";
+  const dueDiff = compareIsoDates(leftDue, rightDue);
+
+  if (dueDiff !== 0) {
+    return dueDiff;
+  }
+
+  return getPriorityRank(right.priority) - getPriorityRank(left.priority);
+}
+
+function getTodoItems(snapshot: StorageSnapshot) {
+  return [...snapshot.tasks].sort(compareTaskTiming);
+}
+
 function getPriorities(snapshot: StorageSnapshot): PriorityItem[] {
   return snapshot.tasks
     .filter((task) => !isCompletedStatus(task.status))
@@ -481,6 +504,7 @@ export function assembleDashboardPayload(
     priorities,
     interviewCalendar: getInterviewCalendar(snapshot),
     interviewBoard: getInterviewBoard(snapshot),
+    todoItems: getTodoItems(snapshot),
     skillMap,
     codingTracker: snapshot.tasks.filter((task) =>
       ["coding", "technical", "algorithm"].some((keyword) =>

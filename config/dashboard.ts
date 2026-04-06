@@ -10,6 +10,7 @@ export const dashboardConfig = {
 
 export const dashboardTabs = [
   "Dashboard",
+  "Todo",
   "Interview Calendar",
   "Past",
   "Skill Map",
