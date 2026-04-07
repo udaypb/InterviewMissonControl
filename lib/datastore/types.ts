@@ -7,6 +7,7 @@ export type SheetName =
   | "recruiter_notes"
   | "skills"
   | "skill_gaps"
+  | "behavioral_bank"
   | "behavioral_stories"
   | "dashboard_summary"
   | "sync_log";
@@ -90,6 +91,7 @@ export interface SkillRow {
   category: string;
   progress_percent: string;
   target_percent: string;
+  notes: string;
   last_updated: string;
 }
 
@@ -106,6 +108,19 @@ export interface BehavioralStoryRow {
   theme: string;
   company_fit: string;
   strength_score: string;
+  notes: string;
+}
+
+export interface BehavioralBankRow {
+  story_id: string;
+  title: string;
+  primary_theme: string;
+  secondary_themes: string;
+  companies: string;
+  status: string;
+  use_for: string;
+  story: string;
+  company_calibration: string;
   notes: string;
 }
 
@@ -131,6 +146,7 @@ export interface StorageSnapshot {
   recruiterNotes: RecruiterNoteRow[];
   skills: SkillRow[];
   skillGaps: SkillGapRow[];
+  behavioralBank: BehavioralBankRow[];
   behavioralStories: BehavioralStoryRow[];
   summaryRows: DashboardSummaryRow[];
   syncLog: SyncLogRow[];
@@ -230,6 +246,26 @@ export interface ResourceItem {
   body: string;
 }
 
+export interface BehavioralStoryCard {
+  storyId: string;
+  title: string;
+  primaryTheme: string;
+  secondaryThemes: string[];
+  companies: string[];
+  status: string;
+  useCases: string[];
+  story: string;
+  companyCalibration: string;
+  notes: string;
+}
+
+export interface BehavioralSkillSignal {
+  skill: string;
+  level: string;
+  risk: string;
+  percent: number;
+}
+
 export interface PastItem {
   id: string;
   kind: "interview" | "round" | "task" | "plan";
@@ -263,6 +299,8 @@ export interface DashboardPayload {
   interviewCalendar: InterviewCalendarItem[];
   interviewBoard: InterviewBoardCard[];
   todoItems: TaskRow[];
+  behavioralBank: BehavioralStoryCard[];
+  behavioralSignals: BehavioralSkillSignal[];
   skillMap: SkillMapItem[];
   codingTracker: TaskRow[];
   resources: ResourceItem[];

@@ -20,6 +20,7 @@ import { appendSyncLogRow, ensureSpreadsheetStructure, readSheets, writeDashboar
 import { getOrSetCache, invalidateCache } from "@/lib/utils/cache";
 import { logError } from "@/lib/utils/logging";
 import {
+  behavioralBankRowSchema,
   behavioralStoryRowSchema,
   companyRowSchema,
   dashboardSummaryRowSchema,
@@ -135,6 +136,8 @@ export function buildFallbackDashboardPayload(message: string): DashboardPayload
     interviewCalendar: [],
     interviewBoard: [],
     todoItems: [],
+    behavioralBank: [],
+    behavioralSignals: [],
     skillMap: [],
     codingTracker: [],
     resources: [],
@@ -189,6 +192,7 @@ async function readSnapshot(): Promise<StorageSnapshot> {
     recruiter_notes: recruiterNotes,
     skills,
     skill_gaps: skillGaps,
+    behavioral_bank: behavioralBank,
     behavioral_stories: behavioralStories,
     dashboard_summary: summaryRows,
     sync_log: syncLog
@@ -201,6 +205,7 @@ async function readSnapshot(): Promise<StorageSnapshot> {
     "recruiter_notes",
     "skills",
     "skill_gaps",
+    "behavioral_bank",
     "behavioral_stories",
     "dashboard_summary",
     "sync_log"
@@ -220,6 +225,7 @@ async function readSnapshot(): Promise<StorageSnapshot> {
     recruiterNotes: parseRows(recruiterNotes, recruiterNoteRowSchema),
     skills: parseRows(skills, skillRowSchema),
     skillGaps: parseRows(skillGaps, skillGapRowSchema),
+    behavioralBank: parseRows(behavioralBank, behavioralBankRowSchema),
     behavioralStories: parseRows(behavioralStories, behavioralStoryRowSchema),
     summaryRows: parseRows(summaryRows, dashboardSummaryRowSchema),
     syncLog: parseRows(syncLog, syncLogRowSchema).reverse()

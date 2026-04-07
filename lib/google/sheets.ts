@@ -72,6 +72,24 @@ function inferSkillCategory(skill: string) {
   return "Core";
 }
 
+function normalizePercentLikeValue(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  switch (normalized) {
+    case "high":
+    case "strong":
+      return "85";
+    case "medium":
+    case "ready":
+      return "65";
+    case "low":
+    case "weak":
+      return "35";
+    default:
+      return value;
+  }
+}
+
 const readHeaderAliases: Partial<Record<SheetName, Record<string, string[]>>> = {
   interviews: {
     date: ["date", "event_date"],
@@ -128,11 +146,23 @@ const readHeaderAliases: Partial<Record<SheetName, Record<string, string[]>>> = 
     next_step: ["next_step", "stage"]
   },
   skills: {
-    progress_percent: ["progress_percent"],
-    notes: ["notes"],
+    progress_percent: ["progress_percent", "level"],
+    notes: ["notes", "risk"],
     category: ["category", "focus_area"],
     target_percent: ["target_percent", "target"],
     last_updated: ["last_updated", "updated_at"]
+  },
+  behavioral_bank: {
+    story_id: ["story_id", "story_id_", "storyid", "story_id_number"],
+    title: ["title"],
+    primary_theme: ["primary_theme", "theme"],
+    secondary_themes: ["secondary_themes", "secondary_theme", "secondary"],
+    companies: ["companies", "company_fit", "company"],
+    status: ["status"],
+    use_for: ["use_for", "use_case", "use_cases"],
+    story: ["story", "body", "narrative"],
+    company_calibration: ["company_calibration", "calibration"],
+    notes: ["notes"]
   },
   dashboard_summary: {
     key: ["key"],
@@ -198,7 +228,14 @@ function canonicalizeRow(
 
   if (sheetName === "skills") {
     canonicalRow.category = canonicalRow.category || inferSkillCategory(canonicalRow.skill);
-    canonicalRow.target_percent = canonicalRow.target_percent || "100";
+    canonicalRow.progress_percent = normalizePercentLikeValue(canonicalRow.progress_percent);
+    canonicalRow.target_percent = normalizePercentLikeValue(canonicalRow.target_percent || "100");
+  }
+
+  if (sheetName === "behavioral_bank") {
+    canonicalRow.story_id = canonicalRow.story_id || `story-${rowIndex + 1}`;
+    canonicalRow.status = canonicalRow.status || "Ready";
+    canonicalRow.story = canonicalRow.story || canonicalRow.notes;
   }
 
   return canonicalRow;

@@ -28,7 +28,7 @@ export function ProgressPanel({ metrics, onOpenSkillMap }: ProgressPanelProps) {
           <div className="rounded-3xl border border-dashed border-border bg-black/10 p-5">
             <p className="text-sm text-text">No progress metrics available.</p>
             <p className="mt-2 text-sm leading-6 text-muted">
-              Seed `skills`, `tasks`, and `behavioral_stories` to light up weekly progress.
+              Seed `skills`, `tasks`, and `behavioral_bank` to light up weekly progress.
             </p>
           </div>
         ) : null}

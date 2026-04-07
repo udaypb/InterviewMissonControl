@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type {
+  BehavioralBankRow,
   BehavioralStoryRow,
   CompanyRow,
   DashboardSummaryRow,
@@ -111,6 +112,7 @@ export const skillRowSchema = z.object({
   category: stringField,
   progress_percent: stringField,
   target_percent: stringField,
+  notes: stringField,
   last_updated: stringField
 }) as z.ZodType<SkillRow>;
 
@@ -120,6 +122,19 @@ export const skillGapRowSchema = z.object({
   gap_score: stringField,
   notes: stringField
 }) as z.ZodType<SkillGapRow>;
+
+export const behavioralBankRowSchema = z.object({
+  story_id: stringField,
+  title: stringField,
+  primary_theme: stringField,
+  secondary_themes: stringField,
+  companies: stringField,
+  status: stringField,
+  use_for: stringField,
+  story: stringField,
+  company_calibration: stringField,
+  notes: stringField
+}) as z.ZodType<BehavioralBankRow>;
 
 export const behavioralStoryRowSchema = z.object({
   story_id: stringField,

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 import { BattlePlan } from "@/components/BattlePlan";
+import { BehavioralBankPanel } from "@/components/BehavioralBankPanel";
 import { CompanyIntel } from "@/components/CompanyIntel";
 import { Header } from "@/components/Header";
 import { MentorFocus } from "@/components/MentorFocus";
@@ -32,6 +33,8 @@ const emptyDashboard: DashboardPayload = {
   interviewCalendar: [],
   interviewBoard: [],
   todoItems: [],
+  behavioralBank: [],
+  behavioralSignals: [],
   skillMap: [],
   codingTracker: [],
   resources: [],
@@ -119,6 +122,16 @@ function DashboardContent({
 
   if (activeTab === "Todo") {
     return <TodoDock tasks={dashboard.todoItems} />;
+  }
+
+  if (activeTab === "Behavioral") {
+    return (
+      <BehavioralBankPanel
+        stories={dashboard.behavioralBank}
+        tasks={dashboard.todoItems}
+        signals={dashboard.behavioralSignals}
+      />
+    );
   }
 
   if (activeTab === "Interview Calendar") {

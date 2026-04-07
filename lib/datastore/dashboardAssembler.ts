@@ -1,5 +1,7 @@
 import type {
   BattlePlanItem,
+  BehavioralSkillSignal,
+  BehavioralStoryCard,
   CompanyIntelCard,
   ConfigStatus,
   DashboardPayload,
@@ -347,6 +349,99 @@ function getTodoItems(snapshot: StorageSnapshot) {
   return [...snapshot.tasks].sort(compareTaskTiming);
 }
 
+function splitList(value: string) {
+  return value
+    .split(/[,\n/]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function getBehavioralStatusRank(status: string) {
+  switch (status.trim().toLowerCase()) {
+    case "strong":
+      return 3;
+    case "ready":
+      return 2;
+    case "medium":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function getLevelLabel(percent: number) {
+  if (percent >= 80) {
+    return "High";
+  }
+  if (percent >= 60) {
+    return "Medium";
+  }
+  return "Low";
+}
+
+function getBehavioralBank(snapshot: StorageSnapshot): BehavioralStoryCard[] {
+  const sourceRows = snapshot.behavioralBank.length > 0
+    ? snapshot.behavioralBank.map((row) => ({
+        storyId: row.story_id,
+        title: row.title,
+        primaryTheme: compactText(row.primary_theme, "Behavioral"),
+        secondaryThemes: splitList(row.secondary_themes),
+        companies: splitList(row.companies),
+        status: compactText(row.status, "Ready"),
+        useCases: splitList(row.use_for),
+        story: compactText(row.story, row.notes),
+        companyCalibration: row.company_calibration,
+        notes: row.notes
+      }))
+    : snapshot.behavioralStories.map((row) => {
+        const percent = clampPercent(row.strength_score);
+        return {
+          storyId: row.story_id,
+          title: row.title,
+          primaryTheme: compactText(row.theme, "Behavioral"),
+          secondaryThemes: [],
+          companies: splitList(row.company_fit),
+          status: percent >= 80 ? "Strong" : percent >= 65 ? "Ready" : "Medium",
+          useCases: splitList(row.theme),
+          story: row.notes,
+          companyCalibration: "",
+          notes: row.notes
+        };
+      });
+
+  return sourceRows.sort((left, right) => {
+    const statusDiff = getBehavioralStatusRank(right.status) - getBehavioralStatusRank(left.status);
+    if (statusDiff !== 0) {
+      return statusDiff;
+    }
+
+    return left.title.localeCompare(right.title);
+  });
+}
+
+function getBehavioralSignals(snapshot: StorageSnapshot): BehavioralSkillSignal[] {
+  const signals = snapshot.skills.filter((skill) => {
+    const normalized = `${skill.skill} ${skill.category}`.toLowerCase();
+    return [
+      "behavior",
+      "story",
+      "communication",
+      "impact",
+      "structured delivery"
+    ].some((keyword) => normalized.includes(keyword));
+  });
+
+  return signals.map((skill) => {
+    const percent = clampPercent(skill.progress_percent);
+    return {
+      skill: skill.skill,
+      level: getLevelLabel(percent),
+      risk: compactText(skill.notes, "Not specified"),
+      percent
+    };
+  }).sort((left, right) => left.percent - right.percent);
+}
+
 function getPriorities(snapshot: StorageSnapshot): PriorityItem[] {
   return snapshot.tasks
     .filter((task) => !isCompletedStatus(task.status))
@@ -464,8 +559,20 @@ function getSkillMap(snapshot: StorageSnapshot): SkillMapItem[] {
 function getWeeklyProgress(snapshot: StorageSnapshot): ProgressMetric[] {
   const skills = getSkillMap(snapshot);
   const completedTasks = snapshot.tasks.filter((task) => task.status.toLowerCase() === "done").length;
-  const storyStrength = snapshot.behavioralStories.length
-    ? snapshot.behavioralStories.reduce((sum, story) => sum + clampPercent(story.strength_score), 0) / snapshot.behavioralStories.length
+  const behavioralBank = getBehavioralBank(snapshot);
+  const storyStrength = behavioralBank.length
+    ? behavioralBank.reduce((sum, story) => {
+        switch (story.status.trim().toLowerCase()) {
+          case "strong":
+            return sum + 90;
+          case "ready":
+            return sum + 75;
+          case "medium":
+            return sum + 55;
+          default:
+            return sum + 40;
+        }
+      }, 0) / behavioralBank.length
     : 0;
 
   return [
@@ -482,7 +589,7 @@ function getWeeklyProgress(snapshot: StorageSnapshot): ProgressMetric[] {
     {
       label: "Behavioral Story Strength",
       percent: Math.round(storyStrength),
-      detail: `${snapshot.behavioralStories.length} stories in rotation`
+      detail: `${behavioralBank.length} stories in rotation`
     }
   ];
 }
@@ -612,6 +719,8 @@ export function assembleDashboardPayload(
 ): DashboardPayload {
   const priorities = getPriorities(snapshot);
   const battlePlan = getBattlePlan(snapshot);
+  const behavioralBank = getBehavioralBank(snapshot);
+  const behavioralSignals = getBehavioralSignals(snapshot);
   const skillMap = getSkillMap(snapshot);
   const weeklyProgress = getWeeklyProgress(snapshot);
   const summaryMap = getSummaryRowMap(snapshot.summaryRows);
@@ -635,6 +744,8 @@ export function assembleDashboardPayload(
     interviewCalendar: getInterviewCalendar(snapshot),
     interviewBoard: getInterviewBoard(snapshot),
     todoItems: getTodoItems(snapshot),
+    behavioralBank,
+    behavioralSignals,
     skillMap,
     codingTracker: snapshot.tasks.filter((task) =>
       ["coding", "technical", "algorithm"].some((keyword) =>

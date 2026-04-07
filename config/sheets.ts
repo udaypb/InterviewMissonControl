@@ -1,4 +1,4 @@
-import type { CompanyRow, DashboardSummaryRow, DailyPlanRow, InterviewRow, RecruiterNoteRow, RoundRow, SheetName, SkillGapRow, SkillRow, SyncLogRow, TaskRow, BehavioralStoryRow } from "@/lib/datastore/types";
+import type { BehavioralBankRow, BehavioralStoryRow, CompanyRow, DashboardSummaryRow, DailyPlanRow, InterviewRow, RecruiterNoteRow, RoundRow, SheetName, SkillGapRow, SkillRow, SyncLogRow, TaskRow } from "@/lib/datastore/types";
 
 export const spreadsheetTitle = "Interview Mission Control";
 
@@ -76,12 +76,25 @@ export const sheetDefinitions = {
     "category",
     "progress_percent",
     "target_percent",
+    "notes",
     "last_updated"
   ],
   skill_gaps: [
     "company",
     "skill",
     "gap_score",
+    "notes"
+  ],
+  behavioral_bank: [
+    "story_id",
+    "title",
+    "primary_theme",
+    "secondary_themes",
+    "companies",
+    "status",
+    "use_for",
+    "story",
+    "company_calibration",
     "notes"
   ],
   behavioral_stories: [
@@ -116,6 +129,7 @@ export const sheetSamples: {
   recruiter_notes: RecruiterNoteRow[];
   skills: SkillRow[];
   skill_gaps: SkillGapRow[];
+  behavioral_bank: BehavioralBankRow[];
   behavioral_stories: BehavioralStoryRow[];
   dashboard_summary: DashboardSummaryRow[];
   sync_log: SyncLogRow[];
@@ -295,6 +309,7 @@ export const sheetSamples: {
       category: "Technical",
       progress_percent: "74",
       target_percent: "90",
+      notes: "Medium risk",
       last_updated: today
     },
     {
@@ -302,6 +317,7 @@ export const sheetSamples: {
       category: "Communication",
       progress_percent: "68",
       target_percent: "88",
+      notes: "High risk under pressure",
       last_updated: today
     },
     {
@@ -309,6 +325,7 @@ export const sheetSamples: {
       category: "Product",
       progress_percent: "61",
       target_percent: "82",
+      notes: "Medium risk",
       last_updated: today
     }
   ],
@@ -324,6 +341,104 @@ export const sheetSamples: {
       skill: "Product Strategy",
       gap_score: "24",
       notes: "Need stronger product judgment with safety lens."
+    }
+  ],
+  behavioral_bank: [
+    {
+      story_id: "S1",
+      title: "$10M Revenue Loss",
+      primary_theme: "Ownership",
+      secondary_themes: "Failure, Testing, Systems",
+      companies: "Microsoft, Meta, Netflix, Google",
+      status: "Ready",
+      use_for: "Failure, Mistake, Ownership",
+      story: "At Amazon Ads, I rolled out an experiment path in a high-scale auction system and missed a critical cross-component integration test. The bug made it to production and contributed to a significant revenue impact. I led the root cause analysis, tightened experiment-path coverage, improved rollout gates, and added stronger monitoring so this class of failure would be caught earlier.",
+      company_calibration: "Microsoft: humility and learning. Meta: scale and response speed. Netflix: judgment and redesign. Google: testing rigor.",
+      notes: "Anchor on ownership and how my operating model changed after the incident."
+    },
+    {
+      story_id: "S2",
+      title: "Multi-Signal Auction Framework",
+      primary_theme: "Design",
+      secondary_themes: "Concurrency, Ambiguity, Scale",
+      companies: "Microsoft, Meta, Netflix, Google",
+      status: "Ready",
+      use_for: "Complex system, Ambiguity, Design decisions",
+      story: "In the ads auction system, multiple real-time signals arrived at different times with different latency profiles. I reframed the problem into a first-class signal framework with clear timeout budgets, precedence rules, and deterministic orchestration so new signals could be added without rewriting core auction logic.",
+      company_calibration: "Meta: scalability and performance. Netflix: clean abstractions. Microsoft: collaboration. Google: tradeoff reasoning.",
+      notes: "Use this for system design and structured problem solving."
+    },
+    {
+      story_id: "S3",
+      title: "AWS ECS Ramp-Up",
+      primary_theme: "Learning",
+      secondary_themes: "Execution, Pressure, Ambiguity",
+      companies: "Microsoft, Meta, Google, Netflix",
+      status: "Ready",
+      use_for: "Learning quickly, New domain, Pressure",
+      story: "I moved from a Google Cloud/Firebase background into AWS ECS and had to deliver a proof of concept in three weeks at roughly 10K TPS. I focused on first principles around scaling, networking, and deployments, then used CDK and targeted observability to get productive quickly instead of trying to memorize the entire platform.",
+      company_calibration: "Microsoft: growth mindset. Meta: execution speed. Google: learning method. Netflix: ownership under ambiguity.",
+      notes: "Good story for fast ramp-up and practical learning."
+    },
+    {
+      story_id: "S4",
+      title: "Observability System",
+      primary_theme: "Debugging",
+      secondary_themes: "Productivity, Reliability",
+      companies: "All",
+      status: "Ready",
+      use_for: "Debugging, Team productivity, Reliability",
+      story: "I realized our debugging pain in a distributed system was really a visibility problem. I built a waterfall-style dashboard that made request flow and downstream timing understandable across services, which reduced time-to-resolution and gave the team a shared debugging language.",
+      company_calibration: "Broadly useful for operational excellence and team leverage.",
+      notes: "Key line: debugging was not the problem; visibility was."
+    },
+    {
+      story_id: "S5",
+      title: "Latency Optimization",
+      primary_theme: "Performance",
+      secondary_themes: "Reliability, Customer Impact",
+      companies: "All",
+      status: "Medium",
+      use_for: "Performance, Customer impact, Reliability",
+      story: "Focus on identifying the true bottleneck, protecting the critical path with timeouts and safeguards, and improving latency without sacrificing correctness.",
+      company_calibration: "Best when the interviewer wants quantitative performance thinking.",
+      notes: "Needs a tighter before/after metric."
+    },
+    {
+      story_id: "S6",
+      title: "AGI Orchestrator Work",
+      primary_theme: "Innovation",
+      secondary_themes: "AI, Scale, Systems",
+      companies: "Meta, Netflix",
+      status: "Strong",
+      use_for: "Innovation, AI work, Forward-looking thinking",
+      story: "I worked on agent orchestration for Nova, focusing on how tools, agents, and context should be coordinated robustly at scale. The interesting challenge was not only model invocation, but designing orchestration that could stay coherent as usage scaled toward millions of users.",
+      company_calibration: "Use selectively as the strongest AI differentiator.",
+      notes: "Resume spike. Use when the role values AI systems thinking."
+    },
+    {
+      story_id: "S7",
+      title: "Conflict and Communication Growth",
+      primary_theme: "Communication",
+      secondary_themes: "Conflict, Growth",
+      companies: "Microsoft",
+      status: "Medium",
+      use_for: "Disagreement, Team dynamics, Growth",
+      story: "My natural style is to think deeply before speaking, which sometimes meant I entered important conversations later than I should have. I learned to surface concerns earlier, even before my thinking was perfectly complete, so the team could benefit from my analysis without paying a coordination cost.",
+      company_calibration: "Best for self-awareness and growth questions.",
+      notes: "Keep this candid and specific."
+    },
+    {
+      story_id: "S8",
+      title: "Proactive System Improvement",
+      primary_theme: "Leadership",
+      secondary_themes: "Initiative, Systems",
+      companies: "All",
+      status: "Medium",
+      use_for: "Initiative, Leadership without authority, Systems improvement",
+      story: "I proactively improved the surrounding engineering system instead of only solving the immediate task, especially around observability, logging, and infra quality. That created leverage for the team and reduced repeated friction over time.",
+      company_calibration: "Use when asked about initiative and raising the engineering bar.",
+      notes: "Tie to a concrete improvement rather than speaking abstractly."
     }
   ],
   behavioral_stories: [
