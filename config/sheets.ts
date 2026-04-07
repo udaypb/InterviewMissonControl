@@ -1,4 +1,4 @@
-import type { BehavioralBankRow, BehavioralStoryRow, CompanyRow, DashboardSummaryRow, DailyPlanRow, InterviewRow, RecruiterNoteRow, RoundRow, SheetName, SkillGapRow, SkillRow, SyncLogRow, TaskRow } from "@/lib/datastore/types";
+import type { BehavioralBankRow, BehavioralStoryRow, CompanyRow, DashboardSummaryRow, DailyPlanRow, InterviewRow, RecruiterNoteRow, ResourceRow, RoundRow, SheetName, SkillGapRow, SkillRow, SyncLogRow, TaskRow } from "@/lib/datastore/types";
 
 export const spreadsheetTitle = "Interview Mission Control";
 
@@ -71,6 +71,15 @@ export const sheetDefinitions = {
     "next_step",
     "notes"
   ],
+  resources: [
+    "resource_id",
+    "title",
+    "category",
+    "company",
+    "url",
+    "status",
+    "notes"
+  ],
   skills: [
     "skill",
     "category",
@@ -135,6 +144,7 @@ export const sheetSamples: {
   daily_plan: DailyPlanRow[];
   companies: CompanyRow[];
   recruiter_notes: RecruiterNoteRow[];
+  resources: ResourceRow[];
   skills: SkillRow[];
   skill_gaps: SkillGapRow[];
   behavioral_bank: BehavioralBankRow[];
@@ -309,6 +319,26 @@ export const sheetSamples: {
       last_contact_date: "2026-04-03",
       next_step: "Share panel topics once confirmed",
       notes: "Still waiting on the loop packet."
+    }
+  ],
+  resources: [
+    {
+      resource_id: "resource-1",
+      title: "Stripe Incident Stories",
+      category: "Behavioral",
+      company: "Stripe",
+      url: "https://example.com/stripe-stories",
+      status: "active",
+      notes: "Use for reliability, incident response, and judgment prep."
+    },
+    {
+      resource_id: "resource-2",
+      title: "Anthropic Product Notes",
+      category: "Company Research",
+      company: "Anthropic",
+      url: "https://example.com/anthropic-notes",
+      status: "active",
+      notes: "Review before product and AI safety conversations."
     }
   ],
   skills: [

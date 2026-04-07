@@ -28,6 +28,7 @@ import {
   interviewRowSchema,
   parseRows,
   recruiterNoteRowSchema,
+  resourceRowSchema,
   roundRowSchema,
   skillGapRowSchema,
   skillRowSchema,
@@ -183,6 +184,31 @@ async function getSystemConfigurationStatus(): Promise<ConfigStatus> {
 }
 
 async function readSnapshot(): Promise<StorageSnapshot> {
+  const requiredSheetNames = [
+    "interviews",
+    "rounds",
+    "tasks",
+    "daily_plan",
+    "companies",
+    "recruiter_notes",
+    "skills",
+    "skill_gaps",
+    "behavioral_bank",
+    "behavioral_stories",
+    "dashboard_summary",
+    "sync_log"
+  ] as const;
+
+  const optionalSheetNames = ["resources"] as const;
+
+  let sheetData: Awaited<ReturnType<typeof readSheets>>;
+
+  try {
+    sheetData = await readSheets([...requiredSheetNames, ...optionalSheetNames]);
+  } catch {
+    sheetData = await readSheets([...requiredSheetNames]);
+  }
+
   const {
     interviews,
     rounds,
@@ -196,20 +222,9 @@ async function readSnapshot(): Promise<StorageSnapshot> {
     behavioral_stories: behavioralStories,
     dashboard_summary: summaryRows,
     sync_log: syncLog
-  } = await readSheets([
-    "interviews",
-    "rounds",
-    "tasks",
-    "daily_plan",
-    "companies",
-    "recruiter_notes",
-    "skills",
-    "skill_gaps",
-    "behavioral_bank",
-    "behavioral_stories",
-    "dashboard_summary",
-    "sync_log"
-  ]);
+  } = sheetData;
+
+  const resources = "resources" in sheetData ? sheetData.resources : [];
 
   const parsedInterviews = parseRows(interviews, interviewRowSchema);
   const parsedRounds = parseRows(rounds, roundRowSchema);
@@ -223,6 +238,7 @@ async function readSnapshot(): Promise<StorageSnapshot> {
     dailyPlan: parseRows(dailyPlan, dailyPlanRowSchema),
     companies: parsedCompanies,
     recruiterNotes: parseRows(recruiterNotes, recruiterNoteRowSchema),
+    resources: parseRows(resources, resourceRowSchema),
     skills: parseRows(skills, skillRowSchema),
     skillGaps: parseRows(skillGaps, skillGapRowSchema),
     behavioralBank: parseRows(behavioralBank, behavioralBankRowSchema),

@@ -145,6 +145,15 @@ const readHeaderAliases: Partial<Record<SheetName, Record<string, string[]>>> = 
     last_contact_date: ["last_contact_date", "date"],
     next_step: ["next_step", "stage"]
   },
+  resources: {
+    resource_id: ["resource_id", "id"],
+    title: ["title", "name", "resource"],
+    category: ["category", "type"],
+    company: ["company"],
+    url: ["url", "link"],
+    status: ["status"],
+    notes: ["notes", "description"]
+  },
   skills: {
     progress_percent: ["progress_percent", "level"],
     notes: ["notes", "risk"],
@@ -235,6 +244,11 @@ function canonicalizeRow(
   if (sheetName === "tasks") {
     canonicalRow.task_id = canonicalRow.task_id || `task-${slugify(canonicalRow.task, String(rowIndex + 1))}`;
     canonicalRow.source = canonicalRow.source || "sheet";
+  }
+
+  if (sheetName === "resources") {
+    canonicalRow.resource_id = canonicalRow.resource_id || `resource-${slugify(canonicalRow.title, String(rowIndex + 1))}`;
+    canonicalRow.status = canonicalRow.status || "active";
   }
 
   if (sheetName === "companies") {

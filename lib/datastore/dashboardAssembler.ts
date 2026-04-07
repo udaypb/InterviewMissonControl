@@ -661,12 +661,18 @@ function getMentorFocus(snapshot: StorageSnapshot, priorities: PriorityItem[], s
 }
 
 function getResources(snapshot: StorageSnapshot) {
-  const cards = getCompanyIntel(snapshot);
-  return cards.slice(0, 3).map((company) => ({
-    title: company.company,
-    subtitle: compactText(company.recruiter, company.status),
-    body: compactText(company.tip, company.nextStep)
-  }));
+  return [...snapshot.resources]
+    .filter((resource) => resource.title.trim())
+    .sort((left, right) => left.title.localeCompare(right.title))
+    .map((resource) => ({
+      id: resource.resource_id,
+      title: resource.title,
+      category: compactText(resource.category, "General"),
+      company: compactText(resource.company, "General"),
+      status: compactText(resource.status, "active"),
+      notes: compactText(resource.notes, "No notes logged."),
+      url: resource.url
+    }));
 }
 
 function getPastItems(snapshot: StorageSnapshot): PastItem[] {

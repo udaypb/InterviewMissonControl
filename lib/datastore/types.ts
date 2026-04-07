@@ -5,6 +5,7 @@ export type SheetName =
   | "daily_plan"
   | "companies"
   | "recruiter_notes"
+  | "resources"
   | "skills"
   | "skill_gaps"
   | "behavioral_bank"
@@ -86,6 +87,16 @@ export interface RecruiterNoteRow {
   notes: string;
 }
 
+export interface ResourceRow {
+  resource_id: string;
+  title: string;
+  category: string;
+  company: string;
+  url: string;
+  status: string;
+  notes: string;
+}
+
 export interface SkillRow {
   skill: string;
   category: string;
@@ -152,6 +163,7 @@ export interface StorageSnapshot {
   dailyPlan: DailyPlanRow[];
   companies: CompanyRow[];
   recruiterNotes: RecruiterNoteRow[];
+  resources: ResourceRow[];
   skills: SkillRow[];
   skillGaps: SkillGapRow[];
   behavioralBank: BehavioralBankRow[];
@@ -249,9 +261,13 @@ export interface SkillMapItem {
 }
 
 export interface ResourceItem {
+  id: string;
   title: string;
-  subtitle: string;
-  body: string;
+  category: string;
+  company: string;
+  status: string;
+  notes: string;
+  url: string;
 }
 
 export interface BehavioralStoryCard {

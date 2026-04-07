@@ -8,6 +8,7 @@ import type {
   DailyPlanRow,
   InterviewRow,
   RecruiterNoteRow,
+  ResourceRow,
   RoundRow,
   SkillGapRow,
   SkillRow,
@@ -106,6 +107,16 @@ export const recruiterNoteRowSchema = z.object({
   next_step: stringField,
   notes: stringField
 }) as z.ZodType<RecruiterNoteRow>;
+
+export const resourceRowSchema = z.object({
+  resource_id: stringField,
+  title: stringField,
+  category: stringField,
+  company: stringField,
+  url: stringField,
+  status: stringField,
+  notes: stringField
+}) as z.ZodType<ResourceRow>;
 
 export const skillRowSchema = z.object({
   skill: stringField,

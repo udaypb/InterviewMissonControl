@@ -431,17 +431,36 @@ function DashboardContent({
       <div className="mt-5 grid gap-4 md:grid-cols-3">
         {dashboard.resources.length === 0 ? (
           <article className="rounded-3xl border border-dashed border-border bg-black/10 p-5 md:col-span-3">
-            <p className="text-sm text-text">No resource cues yet.</p>
+            <p className="text-sm text-text">No resources loaded yet.</p>
             <p className="mt-2 text-sm leading-6 text-muted">
-              Company notes and recruiter context will surface here once the sheets are populated.
+              Add rows to the `resources` sheet tab to drive this section directly.
             </p>
           </article>
         ) : null}
         {dashboard.resources.map((resource) => (
-          <article key={resource.title} className="rounded-3xl border border-border/80 bg-black/10 p-4">
-            <p className="text-sm font-medium">{resource.title}</p>
-            <p className="mt-1 text-xs uppercase tracking-[0.22em] text-muted">{resource.subtitle}</p>
-            <p className="mt-3 text-sm leading-6 text-muted">{resource.body}</p>
+          <article key={resource.id} className="rounded-3xl border border-border/80 bg-black/10 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">{resource.title}</p>
+                <p className="mt-1 text-xs uppercase tracking-[0.22em] text-muted">
+                  {resource.category} · {resource.company}
+                </p>
+              </div>
+              <span className="rounded-full border border-border/70 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-muted">
+                {resource.status}
+              </span>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted">{resource.notes}</p>
+            {resource.url ? (
+              <a
+                href={resource.url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex text-sm text-[#d8d0c4] underline-offset-4 hover:underline"
+              >
+                Open resource
+              </a>
+            ) : null}
           </article>
         ))}
       </div>
