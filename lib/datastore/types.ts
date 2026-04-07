@@ -400,6 +400,10 @@ export interface SkillUpdateResult {
   dashboard: DashboardPayload;
 }
 
+export interface TaskUpdateResult {
+  dashboard: DashboardPayload;
+}
+
 export interface SyncResult {
   status: "success" | "error";
   message: string;
@@ -415,5 +419,6 @@ export interface DataStore {
   getCompanies(): Promise<CompaniesPayload>;
   getSkills(): Promise<SkillsPayload>;
   updateSkillCheck(skillId: string, checked: boolean): Promise<SkillUpdateResult>;
+  updateTaskStatus(taskId: string, checked: boolean): Promise<TaskUpdateResult>;
   syncDashboard(): Promise<SyncResult>;
 }

@@ -1,7 +1,7 @@
 import { google, sheets_v4 } from "googleapis";
 
 import { sheetDefinitions, spreadsheetTitle } from "@/config/sheets";
-import type { DashboardSummaryRow, SheetName, SkillRow, SyncLogRow } from "@/lib/datastore/types";
+import type { DashboardSummaryRow, SheetName, SkillRow, SyncLogRow, TaskRow } from "@/lib/datastore/types";
 import { getSheetsAuth } from "@/lib/google/auth";
 import { logInfo, logWarn } from "@/lib/utils/logging";
 
@@ -628,4 +628,8 @@ export async function writeDashboardSummaryRows(rows: DashboardSummaryRow[]) {
 
 export async function writeSkillsRows(rows: SkillRow[]) {
   await writeRowsPreservingHeaders("skills", rows);
+}
+
+export async function writeTasksRows(rows: TaskRow[]) {
+  await writeRowsPreservingHeaders("tasks", rows);
 }

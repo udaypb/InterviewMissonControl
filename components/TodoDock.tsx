@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
-import type { TaskRow } from "@/lib/datastore/types";
+import type { DashboardPayload, TaskRow, TaskUpdateResult } from "@/lib/datastore/types";
 import { formatDateLabel, getTodayIsoDate } from "@/lib/utils/date";
 import { compactText, titleCase } from "@/lib/utils/formatting";
-
-const STORAGE_KEY = "mission-control.todo.local-checks";
 
 type TodoTab = "Today" | "Overdue" | "Upcoming" | "Done";
 
@@ -20,11 +18,10 @@ function isSheetDone(task: TaskRow) {
   return ["done", "completed", "complete"].includes(normalizeStatus(task.status));
 }
 
-function getTaskBucket(task: TaskRow, checkedMap: Record<string, boolean>): TodoTab {
+function getTaskBucket(task: TaskRow): TodoTab {
   const today = getTodayIsoDate();
-  const locallyDone = checkedMap[task.task_id] || isSheetDone(task);
 
-  if (locallyDone) {
+  if (isSheetDone(task)) {
     return "Done";
   }
 
@@ -52,8 +49,8 @@ function getPriorityTone(priority: string) {
   }
 }
 
-function getDueTone(task: TaskRow, checkedMap: Record<string, boolean>) {
-  const bucket = getTaskBucket(task, checkedMap);
+function getDueTone(task: TaskRow) {
+  const bucket = getTaskBucket(task);
 
   switch (bucket) {
     case "Overdue":
@@ -69,54 +66,41 @@ function getDueTone(task: TaskRow, checkedMap: Record<string, boolean>) {
 
 export function TodoDock({
   tasks,
-  compact = false
+  compact = false,
+  onDashboardUpdate
 }: {
   tasks: TaskRow[];
   compact?: boolean;
+  onDashboardUpdate?: (dashboard: DashboardPayload) => void;
 }) {
   const [activeTab, setActiveTab] = useState<TodoTab>("Today");
   const [activeCategory, setActiveCategory] = useState("All");
-  const [checkedMap, setCheckedMap] = useState<Record<string, boolean>>({});
+  const [localTasks, setLocalTasks] = useState(tasks);
+  const [pendingTaskId, setPendingTaskId] = useState("");
+  const [error, setError] = useState("");
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        return;
-      }
-
-      const parsed = JSON.parse(raw) as Record<string, boolean>;
-      setCheckedMap(parsed);
-    } catch {
-      setCheckedMap({});
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(checkedMap));
-    } catch {
-      return;
-    }
-  }, [checkedMap]);
+    setLocalTasks(tasks);
+  }, [tasks]);
 
   const categories = useMemo(() => {
     const values = new Set(
-      tasks
+      localTasks
         .map((task) => compactText(task.category, "General"))
         .filter(Boolean)
     );
 
     return ["All", ...[...values].sort((left, right) => left.localeCompare(right))];
-  }, [tasks]);
+  }, [localTasks]);
 
   const counts = useMemo(
     () =>
       todoTabs.reduce<Record<TodoTab, number>>((accumulator, tab) => {
-        accumulator[tab] = tasks.filter((task) => getTaskBucket(task, checkedMap) === tab).length;
+        accumulator[tab] = localTasks.filter((task) => getTaskBucket(task) === tab).length;
         return accumulator;
       }, { Today: 0, Overdue: 0, Upcoming: 0, Done: 0 }),
-    [checkedMap, tasks]
+    [localTasks]
   );
 
   useEffect(() => {
@@ -140,8 +124,8 @@ export function TodoDock({
   }, [activeTab, counts]);
 
   const filteredTasks = useMemo(() => {
-    const nextTasks = tasks.filter((task) => {
-      const bucket = getTaskBucket(task, checkedMap);
+    const nextTasks = localTasks.filter((task) => {
+      const bucket = getTaskBucket(task);
       if (bucket !== activeTab) {
         return false;
       }
@@ -153,14 +137,14 @@ export function TodoDock({
       return compactText(task.category, "General") === activeCategory;
     });
 
-    return compact ? nextTasks.slice(0, 6) : nextTasks;
-  }, [activeCategory, activeTab, checkedMap, compact, tasks]);
+      return compact ? nextTasks.slice(0, 6) : nextTasks;
+  }, [activeCategory, activeTab, compact, localTasks]);
 
   const hiddenCount = compact
     ? Math.max(
         0,
-        tasks.filter((task) => {
-          const bucket = getTaskBucket(task, checkedMap);
+        localTasks.filter((task) => {
+          const bucket = getTaskBucket(task);
           if (bucket !== activeTab) {
             return false;
           }
@@ -174,6 +158,48 @@ export function TodoDock({
       )
     : 0;
 
+  async function toggleTask(task: TaskRow, checked: boolean) {
+    setPendingTaskId(task.task_id);
+    setError("");
+    const previousTasks = localTasks;
+    const optimisticTasks = localTasks.map((currentTask) =>
+      currentTask.task_id === task.task_id
+        ? {
+            ...currentTask,
+            status: checked ? "Done" : "Todo",
+            last_updated: new Date().toISOString()
+          }
+        : currentTask
+    );
+    setLocalTasks(optimisticTasks);
+
+    try {
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ taskId: task.task_id, checked })
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error || "Failed to update task.");
+      }
+
+      const result = (await response.json()) as TaskUpdateResult;
+      startTransition(() => {
+        setLocalTasks(result.dashboard.todoItems);
+        onDashboardUpdate?.(result.dashboard);
+      });
+    } catch (nextError) {
+      setLocalTasks(previousTasks);
+      setError(nextError instanceof Error ? nextError.message : "Failed to update task.");
+    } finally {
+      setPendingTaskId("");
+    }
+  }
+
   return (
     <section className="panel p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -181,7 +207,7 @@ export function TodoDock({
           <p className="text-xs uppercase tracking-[0.24em] text-muted">Todo Box</p>
           <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em]">Daily execution queue from the tasks sheet</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-            Check items off locally during the session without mutating the Google Sheet. Due dates drive the board.
+            Check items off here and the `tasks` sheet updates immediately. Due dates drive the board.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -220,6 +246,12 @@ export function TodoDock({
         ))}
       </div>
 
+      {error ? (
+        <div className="mt-4 rounded-[20px] border border-[#a35f53]/40 bg-[#241513] px-4 py-3 text-sm text-[#efb7a9]">
+          {error}
+        </div>
+      ) : null}
+
       <div className="mt-5 space-y-3">
         {filteredTasks.length === 0 ? (
           <div className="rounded-[24px] border border-dashed border-border bg-black/10 p-5">
@@ -231,7 +263,7 @@ export function TodoDock({
         ) : null}
 
         {filteredTasks.map((task) => {
-          const checked = checkedMap[task.task_id] || isSheetDone(task);
+          const checked = isSheetDone(task);
 
           return (
             <article
@@ -246,12 +278,8 @@ export function TodoDock({
                 <button
                   type="button"
                   aria-label={checked ? `Uncheck ${task.task}` : `Check ${task.task}`}
-                  onClick={() =>
-                    setCheckedMap((current) => ({
-                      ...current,
-                      [task.task_id]: !checked
-                    }))
-                  }
+                  disabled={pendingTaskId === task.task_id}
+                  onClick={() => void toggleTask(task, !checked)}
                   className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition ${
                     checked
                       ? "border-[#88c098] bg-[#2d5135] text-white"
@@ -272,7 +300,7 @@ export function TodoDock({
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <span className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getDueTone(task, checkedMap)}`}>
+                      <span className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getDueTone(task)}`}>
                         {task.due_date ? `Due ${formatDateLabel(task.due_date)}` : "No due date"}
                       </span>
                       <span className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${getPriorityTone(task.priority)}`}>
@@ -290,9 +318,9 @@ export function TodoDock({
                         {task.estimated_minutes} min
                       </span>
                     ) : null}
-                    {checked && !isSheetDone(task) ? (
-                      <span className="rounded-full border border-[#6d8d77]/35 bg-[#132016] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#c3d8c8]">
-                        Session checked
+                    {pendingTaskId === task.task_id ? (
+                      <span className="rounded-full border border-[#6d87b7]/30 bg-[#121a27] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[#b5c8ed]">
+                        Saving
                       </span>
                     ) : null}
                   </div>

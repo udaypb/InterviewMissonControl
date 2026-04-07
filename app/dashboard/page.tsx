@@ -104,7 +104,7 @@ function DashboardContent({
         <TopStats stats={dashboard.topStats} />
         <div className="hidden lg:block">
           <div className="grid gap-5 xl:grid-cols-[1.25fr_0.95fr]">
-            <TodoDock tasks={dashboard.todoItems} compact />
+            <TodoDock tasks={dashboard.todoItems} compact onDashboardUpdate={onDashboardUpdate} />
             <BattlePlan items={dashboard.battlePlan} />
           </div>
           <div className="mt-5 grid gap-5 xl:grid-cols-2">
@@ -114,7 +114,7 @@ function DashboardContent({
           </div>
         </div>
         <div className="grid gap-5 lg:hidden">
-          <TodoDock tasks={dashboard.todoItems} compact />
+          <TodoDock tasks={dashboard.todoItems} compact onDashboardUpdate={onDashboardUpdate} />
           <BattlePlan items={dashboard.battlePlan} />
           <MentorFocus cards={dashboard.mentorFocus} />
           <CompanyIntel companies={dashboard.companyIntel} />
@@ -125,7 +125,7 @@ function DashboardContent({
   }
 
   if (activeTab === "Todo") {
-    return <TodoDock tasks={dashboard.todoItems} />;
+    return <TodoDock tasks={dashboard.todoItems} onDashboardUpdate={onDashboardUpdate} />;
   }
 
   if (activeTab === "Behavioral Interview Prep") {

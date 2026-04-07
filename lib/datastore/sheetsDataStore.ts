@@ -12,14 +12,16 @@ import type {
   SkillsPayload,
   StorageSnapshot,
   SyncResult,
+  TaskUpdateResult,
   TaskRow,
   TasksPayload
 } from "@/lib/datastore/types";
 import { assembleDashboardPayload, buildSummaryRows } from "@/lib/datastore/dashboardAssembler";
 import { applySkillCheck, buildSkillInsights } from "@/lib/datastore/skillTree";
 import { ensureDriveWorkspaceStructure, getDriveWorkspaceStatus } from "@/lib/google/drive";
-import { appendSyncLogRow, ensureSpreadsheetStructure, readSheets, writeDashboardSummaryRows, writeSkillsRows } from "@/lib/google/sheets";
+import { appendSyncLogRow, ensureSpreadsheetStructure, readSheets, writeDashboardSummaryRows, writeSkillsRows, writeTasksRows } from "@/lib/google/sheets";
 import { getOrSetCache, invalidateCache } from "@/lib/utils/cache";
+import { compactText } from "@/lib/utils/formatting";
 import { logError } from "@/lib/utils/logging";
 import {
   behavioralBankRowSchema,
@@ -88,6 +90,40 @@ function enrichTasks(tasks: TaskRow[], companies: CompanyRow[], interviews: Inte
       company: matchedCompany || inferCompanyFromTaskTitle(task.task)
     };
   });
+}
+
+function isCompletedTaskStatus(status: string) {
+  return ["done", "completed", "complete"].includes(status.trim().toLowerCase());
+}
+
+function applyTaskStatus(tasks: TaskRow[], taskId: string, checked: boolean) {
+  const nextStatus = checked ? "Done" : "Todo";
+  const now = new Date().toISOString();
+  let found = false;
+
+  const updatedTasks = tasks.map((task) => {
+    if (task.task_id !== taskId) {
+      return task;
+    }
+
+    found = true;
+
+    return {
+      ...task,
+      status: checked
+        ? "Done"
+        : isCompletedTaskStatus(task.status)
+          ? nextStatus
+          : compactText(task.status, nextStatus),
+      last_updated: now
+    };
+  });
+
+  if (!found) {
+    throw new Error("Task not found.");
+  }
+
+  return updatedTasks;
 }
 
 export function buildFallbackDashboardPayload(message: string): DashboardPayload {
@@ -324,6 +360,25 @@ export class SheetsDataStore implements DataStore {
     invalidateCache("storage-snapshot");
     invalidateCache("dashboard-summary");
     invalidateCache("skills");
+
+    return {
+      dashboard: assembleDashboardPayload(nextSnapshot, await getSystemConfigurationStatus())
+    };
+  }
+
+  async updateTaskStatus(taskId: string, checked: boolean): Promise<TaskUpdateResult> {
+    await ensureSpreadsheetStructure();
+    const snapshot = await readSnapshot();
+    const nextTasks = applyTaskStatus(snapshot.tasks, taskId, checked);
+    const nextSnapshot: StorageSnapshot = {
+      ...snapshot,
+      tasks: nextTasks
+    };
+
+    await writeTasksRows(nextTasks);
+    invalidateCache("storage-snapshot");
+    invalidateCache("dashboard-summary");
+    invalidateCache("tasks");
 
     return {
       dashboard: assembleDashboardPayload(nextSnapshot, await getSystemConfigurationStatus())
