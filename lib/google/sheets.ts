@@ -164,6 +164,22 @@ const readHeaderAliases: Partial<Record<SheetName, Record<string, string[]>>> = 
     company_calibration: ["company_calibration", "calibration"],
     notes: ["notes"]
   },
+  behavioral_stories: {
+    story_id: ["story_id"],
+    title: ["title"],
+    theme: ["theme", "primary_theme"],
+    company_fit: ["company_fit", "companies", "company"],
+    strength_score: ["strength_score", "score"],
+    resume_anchor: ["resume_anchor"],
+    use_for: ["use_for", "use_case", "use_cases"],
+    situation: ["situation"],
+    task: ["task"],
+    action: ["action"],
+    result: ["result"],
+    reflection: ["reflection"],
+    delivery_notes: ["delivery_notes"],
+    notes: ["notes", "delivery_notes", "reflection"]
+  },
   dashboard_summary: {
     key: ["key"],
     value: ["value"],

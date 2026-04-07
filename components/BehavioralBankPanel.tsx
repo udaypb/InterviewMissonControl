@@ -99,7 +99,7 @@ export function BehavioralBankPanel({
           <p className="text-xs uppercase tracking-[0.24em] text-muted">Behavioral Interview Prep</p>
           <h2 className="mt-2 text-[1.85rem] font-semibold tracking-[-0.045em]">Story bank, delivery risks, and next reps</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-            This section is driven by the `behavioral_bank`, `tasks`, and `skills` tabs so your behavioral prep stays operational instead of scattered.
+            This section is driven by the behavioral story sheet plus `tasks` and `skills`, so your interview stories, delivery signals, and reps stay operational instead of scattered.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -123,14 +123,14 @@ export function BehavioralBankPanel({
 
       <div className="mt-6 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-4">
-          {stories.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-border bg-black/10 p-5">
-              <p className="text-sm text-text">No behavioral stories loaded.</p>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                Add rows in `behavioral_bank` to track story quality, coverage, and company calibration.
-              </p>
-            </div>
-          ) : null}
+              {stories.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-border bg-black/10 p-5">
+                  <p className="text-sm text-text">No behavioral stories loaded.</p>
+                  <p className="mt-2 text-sm leading-6 text-muted">
+                Add rows in `behavioral_stories` or `behavioral_bank` to track story quality, coverage, and company calibration.
+                  </p>
+                </div>
+              ) : null}
 
           {stories.map((story) => (
             <article key={story.storyId} className="rounded-[28px] border border-border/80 bg-[linear-gradient(180deg,rgba(17,17,17,0.82),rgba(10,10,10,0.94))] p-5 shadow-[0_14px_26px_rgba(0,0,0,0.18)]">

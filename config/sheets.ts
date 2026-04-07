@@ -103,6 +103,14 @@ export const sheetDefinitions = {
     "theme",
     "company_fit",
     "strength_score",
+    "resume_anchor",
+    "use_for",
+    "situation",
+    "task",
+    "action",
+    "result",
+    "reflection",
+    "delivery_notes",
     "notes"
   ],
   dashboard_summary: [
@@ -448,6 +456,14 @@ export const sheetSamples: {
       theme: "ownership",
       company_fit: "Stripe",
       strength_score: "82",
+      resume_anchor: "Amazon Ads",
+      use_for: "ownership, failure",
+      situation: "Critical launch went sideways under production pressure.",
+      task: "Contain impact and restore confidence quickly.",
+      action: "Coordinated response, tightened the rollout path, and aligned teams around the fix.",
+      result: "Stabilized the launch and created a better path for future rollouts.",
+      reflection: "The lesson was to contain fast, communicate clearly, and fix the system, not just the incident.",
+      delivery_notes: "Keep the arc crisp and grounded.",
       notes: "Good for urgency and customer trust."
     },
     {
@@ -456,6 +472,14 @@ export const sheetSamples: {
       theme: "judgment",
       company_fit: "Anthropic",
       strength_score: "76",
+      resume_anchor: "Product strategy work",
+      use_for: "judgment, prioritization",
+      situation: "A new signal invalidated the prior roadmap assumptions.",
+      task: "Re-evaluate the plan without thrashing the team.",
+      action: "Reframed the problem, aligned stakeholders, and updated the plan around the new constraint.",
+      result: "Preserved delivery momentum while moving the team toward the better decision.",
+      reflection: "Judgment is often about changing direction early enough, not defending the old plan.",
+      delivery_notes: "Emphasize why the decision changed.",
       notes: "Needs tighter AI relevance."
     }
   ],

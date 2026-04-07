@@ -395,6 +395,14 @@ function getBehavioralBank(snapshot: StorageSnapshot): BehavioralStoryCard[] {
       }))
     : snapshot.behavioralStories.map((row) => {
         const percent = clampPercent(row.strength_score);
+        const storySections = [
+          row.situation ? `Situation: ${row.situation}` : "",
+          row.task ? `Task: ${row.task}` : "",
+          row.action ? `Action: ${row.action}` : "",
+          row.result ? `Result: ${row.result}` : "",
+          row.reflection ? `Reflection: ${row.reflection}` : ""
+        ].filter(Boolean);
+        const calibration = [row.resume_anchor, row.delivery_notes].filter(Boolean).join(" · ");
         return {
           storyId: row.story_id,
           title: row.title,
@@ -402,10 +410,10 @@ function getBehavioralBank(snapshot: StorageSnapshot): BehavioralStoryCard[] {
           secondaryThemes: [],
           companies: splitList(row.company_fit),
           status: percent >= 80 ? "Strong" : percent >= 65 ? "Ready" : "Medium",
-          useCases: splitList(row.theme),
-          story: row.notes,
-          companyCalibration: "",
-          notes: row.notes
+          useCases: splitList(row.use_for || row.theme),
+          story: storySections.join("\n\n") || row.notes,
+          companyCalibration: calibration,
+          notes: compactText(row.notes, row.delivery_notes || row.reflection)
         };
       });
 

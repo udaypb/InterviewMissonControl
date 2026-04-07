@@ -108,6 +108,14 @@ export interface BehavioralStoryRow {
   theme: string;
   company_fit: string;
   strength_score: string;
+  resume_anchor: string;
+  use_for: string;
+  situation: string;
+  task: string;
+  action: string;
+  result: string;
+  reflection: string;
+  delivery_notes: string;
   notes: string;
 }
 

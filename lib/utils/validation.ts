@@ -142,6 +142,14 @@ export const behavioralStoryRowSchema = z.object({
   theme: stringField,
   company_fit: stringField,
   strength_score: stringField,
+  resume_anchor: stringField,
+  use_for: stringField,
+  situation: stringField,
+  task: stringField,
+  action: stringField,
+  result: stringField,
+  reflection: stringField,
+  delivery_notes: stringField,
   notes: stringField
 }) as z.ZodType<BehavioralStoryRow>;
 
