@@ -11,7 +11,7 @@ export const dashboardConfig = {
 export const dashboardTabs = [
   "Dashboard",
   "Todo",
-  "Behavioral",
+  "Behavioral Interview Prep",
   "Interview Calendar",
   "Past",
   "Skill Map",

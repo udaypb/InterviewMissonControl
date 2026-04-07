@@ -124,7 +124,7 @@ function DashboardContent({
     return <TodoDock tasks={dashboard.todoItems} />;
   }
 
-  if (activeTab === "Behavioral") {
+  if (activeTab === "Behavioral Interview Prep") {
     return (
       <BehavioralBankPanel
         stories={dashboard.behavioralBank}

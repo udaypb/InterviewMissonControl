@@ -33,6 +33,51 @@ function getRiskTone(risk: string) {
   return "border-[#6b9274]/35 bg-[#132017] text-[#c2d7c6]";
 }
 
+function getStoryStatusScore(status: string) {
+  switch (status.trim().toLowerCase()) {
+    case "strong":
+      return 90;
+    case "ready":
+      return 75;
+    case "medium":
+      return 55;
+    default:
+      return 40;
+  }
+}
+
+function getExperienceStatus(stories: BehavioralStoryCard[], signals: BehavioralSkillSignal[]) {
+  const storyScore = stories.length > 0
+    ? stories.reduce((sum, story) => sum + getStoryStatusScore(story.status), 0) / stories.length
+    : 0;
+  const signalScore = signals.length > 0
+    ? signals.reduce((sum, signal) => sum + signal.percent, 0) / signals.length
+    : storyScore;
+  const overallScore = Math.round((storyScore + signalScore) / 2);
+
+  if (overallScore >= 80) {
+    return {
+      label: "Strong",
+      detail: `${overallScore}% readiness across stories and delivery signals`,
+      tone: "border-[#6b9274]/35 bg-[#132017] text-[#c2d7c6]"
+    };
+  }
+
+  if (overallScore >= 65) {
+    return {
+      label: "Building",
+      detail: `${overallScore}% readiness with a solid base`,
+      tone: "border-[#6d87b7]/35 bg-[#121a27] text-[#c5d6f5]"
+    };
+  }
+
+  return {
+    label: "Needs Reps",
+    detail: `${overallScore}% readiness and still fragile under pressure`,
+    tone: "border-[#d67658]/35 bg-[#291713] text-[#f1b29f]"
+  };
+}
+
 export function BehavioralBankPanel({
   stories,
   tasks,
@@ -45,12 +90,13 @@ export function BehavioralBankPanel({
   const behavioralTasks = tasks.filter(isBehavioralTask).slice(0, 8);
   const readyStories = stories.filter((story) => ["ready", "strong"].includes(story.status.toLowerCase())).length;
   const topRisk = signals[0];
+  const experienceStatus = getExperienceStatus(stories, signals);
 
   return (
     <section className="panel p-6 md:p-7">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-muted">Behavioral Interview</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-muted">Behavioral Interview Prep</p>
           <h2 className="mt-2 text-[1.85rem] font-semibold tracking-[-0.045em]">Story bank, delivery risks, and next reps</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
             This section is driven by the `behavioral_bank`, `tasks`, and `skills` tabs so your behavioral prep stays operational instead of scattered.
@@ -58,17 +104,19 @@ export function BehavioralBankPanel({
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-[22px] border border-[#6d87b7]/30 bg-[#121a27] px-4 py-4">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Ready Stories</p>
-            <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-text">{readyStories}</p>
+            <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Total Stories</p>
+            <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-text">{stories.length}</p>
+            <p className="mt-1 text-sm text-muted">{readyStories} ready or strong</p>
+          </div>
+          <div className={`rounded-[22px] border px-4 py-4 ${experienceStatus.tone}`}>
+            <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Current Experience Status</p>
+            <p className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-text">{experienceStatus.label}</p>
+            <p className="mt-1 text-sm text-muted">{experienceStatus.detail}</p>
           </div>
           <div className="rounded-[22px] border border-[#b88c54]/30 bg-[#21170f] px-4 py-4">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Behavioral Tasks</p>
+            <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Next Reps</p>
             <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-text">{behavioralTasks.length}</p>
-          </div>
-          <div className="rounded-[22px] border border-border/70 bg-black/10 px-4 py-4">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-muted">Top Risk</p>
-            <p className="mt-3 text-sm font-medium text-text">{topRisk ? topRisk.skill : "Not tracked"}</p>
-            <p className="mt-1 text-sm text-muted">{topRisk ? topRisk.risk : "Add skills risk rows"}</p>
+            <p className="mt-1 text-sm text-muted">{topRisk ? `${topRisk.skill} · ${topRisk.risk}` : "No behavioral risk tracked yet"}</p>
           </div>
         </div>
       </div>
