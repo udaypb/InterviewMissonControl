@@ -1,7 +1,7 @@
 import { google, sheets_v4 } from "googleapis";
 
 import { sheetDefinitions, spreadsheetTitle } from "@/config/sheets";
-import type { DashboardSummaryRow, SheetName, SyncLogRow } from "@/lib/datastore/types";
+import type { DashboardSummaryRow, SheetName, SkillRow, SyncLogRow } from "@/lib/datastore/types";
 import { getSheetsAuth } from "@/lib/google/auth";
 import { logInfo, logWarn } from "@/lib/utils/logging";
 
@@ -156,11 +156,17 @@ const readHeaderAliases: Partial<Record<SheetName, Record<string, string[]>>> = 
     notes: ["notes", "usage_notes"]
   },
   skills: {
+    skill_id: ["skill_id", "id"],
     progress_percent: ["progress_percent", "level"],
     notes: ["notes", "risk"],
     category: ["category", "focus_area"],
+    domain: ["domain", "top_level_domain", "pillar"],
+    parent_skill: ["parent_skill", "parent", "parent_id"],
+    item_type: ["item_type", "row_type", "type"],
+    is_checked: ["is_checked", "checked", "done"],
     target_percent: ["target_percent", "target"],
-    last_updated: ["last_updated", "updated_at"]
+    last_updated: ["last_updated", "updated_at"],
+    sort_order: ["sort_order", "order", "position"]
   },
   behavioral_bank: {
     story_id: ["story_id", "story_id_", "storyid", "story_id_number"],
@@ -259,9 +265,38 @@ function canonicalizeRow(
   }
 
   if (sheetName === "skills") {
+    const normalizedType = canonicalRow.item_type.trim().toLowerCase();
+    const explicitType =
+      normalizedType === "domain" || normalizedType === "group" || normalizedType === "item"
+        ? normalizedType
+        : normalizedType === "child" || normalizedType === "subskill" || normalizedType === "checklist"
+          ? "item"
+          : "";
+
+    canonicalRow.skill = canonicalRow.skill || canonicalRow.domain || canonicalRow.category || `Skill ${rowIndex + 1}`;
     canonicalRow.category = canonicalRow.category || inferSkillCategory(canonicalRow.skill);
-    canonicalRow.progress_percent = normalizePercentLikeValue(canonicalRow.progress_percent);
+    canonicalRow.domain =
+      canonicalRow.domain ||
+      (!canonicalRow.parent_skill && explicitType !== "item" ? canonicalRow.skill : canonicalRow.category || inferSkillCategory(canonicalRow.skill));
+    canonicalRow.item_type =
+      explicitType ||
+      (canonicalRow.parent_skill
+        ? "item"
+        : canonicalRow.domain && normalizeHeader(canonicalRow.domain) !== normalizeHeader(canonicalRow.skill)
+          ? "item"
+          : "domain");
+    canonicalRow.is_checked = canonicalRow.is_checked || "";
+    canonicalRow.progress_percent = normalizePercentLikeValue(
+      canonicalRow.progress_percent || (canonicalRow.is_checked ? "100" : "0")
+    );
     canonicalRow.target_percent = normalizePercentLikeValue(canonicalRow.target_percent || "100");
+    canonicalRow.skill_id =
+      canonicalRow.skill_id ||
+      slugify(
+        `${canonicalRow.domain}-${canonicalRow.parent_skill}-${canonicalRow.skill}`,
+        `skill-${rowIndex + 1}`
+      );
+    canonicalRow.sort_order = canonicalRow.sort_order || String(rowIndex + 1);
   }
 
   if (sheetName === "behavioral_bank") {
@@ -291,6 +326,31 @@ async function getCurrentSheetHeaders(sheetName: SheetName) {
   });
 
   return ((response.data.values?.[0] ?? []) as string[]).filter((header) => header.trim().length > 0);
+}
+
+function getCanonicalHeaderForActualHeader(sheetName: SheetName, actualHeader: string) {
+  const normalizedActualHeader = normalizeHeader(actualHeader);
+  const aliases = readHeaderAliases[sheetName] ?? {};
+
+  for (const [canonicalHeader, candidates] of Object.entries(aliases)) {
+    const allCandidates = [canonicalHeader, ...candidates];
+    if (allCandidates.some((candidate) => normalizeHeader(candidate) === normalizedActualHeader)) {
+      return canonicalHeader;
+    }
+  }
+
+  return normalizedActualHeader;
+}
+
+function rowToSheetHeaderArray(
+  sheetName: SheetName,
+  row: Record<string, string>,
+  actualHeaders: readonly string[]
+) {
+  return actualHeaders.map((actualHeader) => {
+    const canonicalHeader = getCanonicalHeaderForActualHeader(sheetName, actualHeader);
+    return row[canonicalHeader] ?? row[actualHeader] ?? "";
+  });
 }
 
 function getStructureCacheTimestamp() {
@@ -465,6 +525,29 @@ export async function writeSheet<T extends object>(
   });
 }
 
+async function writeRowsPreservingHeaders<T extends object>(
+  sheetName: SheetName,
+  rows: T[]
+) {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) {
+    throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID");
+  }
+
+  const headers = await getCurrentSheetHeaders(sheetName);
+  const effectiveHeaders = headers.length > 0 ? headers : [...sheetDefinitions[sheetName]];
+  const sheets = await getSheetsClient();
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: toA1Range(sheetName),
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [[...effectiveHeaders], ...rows.map((row) => rowToSheetHeaderArray(sheetName, row as Record<string, string>, effectiveHeaders))]
+    }
+  });
+}
+
 export async function appendSyncLogRow(row: SyncLogRow) {
   const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
   if (!spreadsheetId) {
@@ -490,21 +573,9 @@ export async function appendSyncLogRow(row: SyncLogRow) {
 }
 
 export async function writeDashboardSummaryRows(rows: DashboardSummaryRow[]) {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
-  if (!spreadsheetId) {
-    throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID");
-  }
+  await writeRowsPreservingHeaders("dashboard_summary", rows);
+}
 
-  const headers = await getCurrentSheetHeaders("dashboard_summary");
-  const effectiveHeaders = headers.length > 0 ? headers : [...sheetDefinitions.dashboard_summary];
-  const sheets = await getSheetsClient();
-
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: toA1Range("dashboard_summary"),
-    valueInputOption: "RAW",
-    requestBody: {
-      values: [[...effectiveHeaders], ...rows.map((row) => rowToArray(row as unknown as Record<string, string>, effectiveHeaders))]
-    }
-  });
+export async function writeSkillsRows(rows: SkillRow[]) {
+  await writeRowsPreservingHeaders("skills", rows);
 }

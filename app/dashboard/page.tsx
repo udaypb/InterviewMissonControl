@@ -9,6 +9,7 @@ import { Header } from "@/components/Header";
 import { MentorFocus } from "@/components/MentorFocus";
 import { MobileSummary } from "@/components/MobileSummary";
 import { ProgressPanel } from "@/components/ProgressPanel";
+import { SkillTreePanel } from "@/components/SkillTreePanel";
 import { StatusBar } from "@/components/StatusBar";
 import { Tabs, type DashboardTab } from "@/components/Tabs";
 import { TodoDock } from "@/components/TodoDock";
@@ -36,6 +37,7 @@ const emptyDashboard: DashboardPayload = {
   behavioralBank: [],
   behavioralSignals: [],
   skillMap: [],
+  skillDomains: [],
   codingTracker: [],
   resources: [],
   pastItems: [],
@@ -88,11 +90,13 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 function DashboardContent({
   dashboard,
   activeTab,
-  onOpenSkillMap
+  onOpenSkillMap,
+  onDashboardUpdate
 }: {
   dashboard: DashboardPayload;
   activeTab: DashboardTab;
   onOpenSkillMap: () => void;
+  onDashboardUpdate: (dashboard: DashboardPayload) => void;
 }) {
   if (activeTab === "Dashboard") {
     return (
@@ -355,41 +359,12 @@ function DashboardContent({
   }
 
   if (activeTab === "Skill Map") {
-    const items = dashboard.skillMap;
     return (
-      <section className="panel p-6">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-muted">Skill Map</p>
-            <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em]">Weakest area: {dashboard.weakestArea}</h2>
-          </div>
-        </div>
-        <div className="mt-6 space-y-5">
-          {items.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-border bg-black/10 p-5">
-              <p className="text-sm text-text">No skill data available.</p>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                Add rows in `skills` and `skill_gaps` to unlock readiness and weakest-area insights.
-              </p>
-            </div>
-          ) : null}
-          {items.map((item) => (
-            <div key={item.skill}>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm">{item.skill}</p>
-                  <p className="text-xs uppercase tracking-[0.2em] text-muted">{item.category}</p>
-                </div>
-                <span className="text-sm text-muted">{item.progressPercent}% / {item.targetPercent}%</span>
-              </div>
-              <div className="h-3 rounded-full bg-[color:var(--track)]">
-                <div className="h-3 rounded-full bg-text" style={{ width: `${item.progressPercent}%` }} />
-              </div>
-              <p className="mt-2 text-sm text-muted">{item.weakestForCompany ? `Most acute for ${item.weakestForCompany}` : "No company-specific gap logged."}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <SkillTreePanel
+        domains={dashboard.skillDomains}
+        weakestArea={dashboard.weakestArea}
+        onDashboardUpdate={onDashboardUpdate}
+      />
     );
   }
 
@@ -549,6 +524,11 @@ export default function DashboardPage() {
           dashboard={dashboard}
           activeTab={activeTab}
           onOpenSkillMap={() => setActiveTab("Skill Map")}
+          onDashboardUpdate={(nextDashboard) =>
+            startTransition(() => {
+              setDashboard((current) => mergeDashboardState(current, nextDashboard));
+            })
+          }
         />
       )}
     </main>

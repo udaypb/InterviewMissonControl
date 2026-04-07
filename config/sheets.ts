@@ -82,12 +82,18 @@ export const sheetDefinitions = {
     "notes"
   ],
   skills: [
+    "skill_id",
     "skill",
     "category",
+    "domain",
+    "parent_skill",
+    "item_type",
+    "is_checked",
     "progress_percent",
     "target_percent",
     "notes",
-    "last_updated"
+    "last_updated",
+    "sort_order"
   ],
   skill_gaps: [
     "company",
@@ -346,28 +352,46 @@ export const sheetSamples: {
   ],
   skills: [
     {
+      skill_id: "skill-distributed-systems",
       skill: "Distributed Systems",
       category: "Technical",
+      domain: "Distributed Systems",
+      parent_skill: "",
+      item_type: "domain",
+      is_checked: "",
       progress_percent: "74",
       target_percent: "90",
       notes: "Medium risk",
-      last_updated: today
+      last_updated: today,
+      sort_order: "1"
     },
     {
+      skill_id: "skill-behavioral-storytelling",
       skill: "Behavioral Storytelling",
       category: "Communication",
+      domain: "Behavioral Storytelling",
+      parent_skill: "",
+      item_type: "domain",
+      is_checked: "",
       progress_percent: "68",
       target_percent: "88",
       notes: "High risk under pressure",
-      last_updated: today
+      last_updated: today,
+      sort_order: "2"
     },
     {
+      skill_id: "skill-product-strategy",
       skill: "Product Strategy",
       category: "Product",
+      domain: "Product Strategy",
+      parent_skill: "",
+      item_type: "domain",
+      is_checked: "",
       progress_percent: "61",
       target_percent: "82",
       notes: "Medium risk",
-      last_updated: today
+      last_updated: today,
+      sort_order: "3"
     }
   ],
   skill_gaps: [

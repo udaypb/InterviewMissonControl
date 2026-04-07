@@ -99,12 +99,18 @@ export interface ResourceRow {
 }
 
 export interface SkillRow {
+  skill_id: string;
   skill: string;
   category: string;
+  domain: string;
+  parent_skill: string;
+  item_type: string;
+  is_checked: string;
   progress_percent: string;
   target_percent: string;
   notes: string;
   last_updated: string;
+  sort_order: string;
 }
 
 export interface SkillGapRow {
@@ -261,6 +267,33 @@ export interface SkillMapItem {
   weakestForCompany?: string;
 }
 
+export interface SkillTreeNode {
+  id: string;
+  label: string;
+  kind: "group" | "item";
+  domain: string;
+  checked: boolean;
+  canCheck: boolean;
+  progressPercent: number;
+  targetPercent: number;
+  notes: string;
+  weakestForCompany?: string;
+  children: SkillTreeNode[];
+}
+
+export interface SkillDomain {
+  id: string;
+  label: string;
+  progressPercent: number;
+  targetPercent: number;
+  completedCount: number;
+  totalCount: number;
+  notes: string;
+  weakestForCompany?: string;
+  hasChecklist: boolean;
+  children: SkillTreeNode[];
+}
+
 export interface ResourceItem {
   id: string;
   title: string;
@@ -328,6 +361,7 @@ export interface DashboardPayload {
   behavioralBank: BehavioralStoryCard[];
   behavioralSignals: BehavioralSkillSignal[];
   skillMap: SkillMapItem[];
+  skillDomains: SkillDomain[];
   codingTracker: TaskRow[];
   resources: ResourceItem[];
   pastItems: PastItem[];
@@ -354,8 +388,13 @@ export interface CompaniesPayload {
 
 export interface SkillsPayload {
   skills: SkillMapItem[];
+  skillDomains: SkillDomain[];
   skillGaps: SkillGapRow[];
   weakestArea: string;
+}
+
+export interface SkillUpdateResult {
+  dashboard: DashboardPayload;
 }
 
 export interface SyncResult {
@@ -372,5 +411,6 @@ export interface DataStore {
   getTasks(): Promise<TasksPayload>;
   getCompanies(): Promise<CompaniesPayload>;
   getSkills(): Promise<SkillsPayload>;
+  updateSkillCheck(skillId: string, checked: boolean): Promise<SkillUpdateResult>;
   syncDashboard(): Promise<SyncResult>;
 }

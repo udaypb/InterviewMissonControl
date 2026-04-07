@@ -18,6 +18,7 @@ import type {
   TaskRow,
   DailyPlanRow
 } from "@/lib/datastore/types";
+import { buildSkillInsights } from "@/lib/datastore/skillTree";
 import { compareIsoDates, formatDateLabel, formatDateTimeLabel, getTodayIsoDate, humanNowLine, relativeUrgency } from "@/lib/utils/date";
 import { clampPercent, compactText, formatCountLabel } from "@/lib/utils/formatting";
 
@@ -566,15 +567,7 @@ function getCompanyIntel(snapshot: StorageSnapshot): CompanyIntelCard[] {
 }
 
 function getSkillMap(snapshot: StorageSnapshot): SkillMapItem[] {
-  const weakestForSkill = new Map(snapshot.skillGaps.map((gap) => [gap.skill, gap.company]));
-
-  return snapshot.skills.map((skill) => ({
-    skill: skill.skill,
-    category: skill.category,
-    progressPercent: clampPercent(skill.progress_percent),
-    targetPercent: clampPercent(skill.target_percent),
-    weakestForCompany: weakestForSkill.get(skill.skill)
-  }));
+  return buildSkillInsights(snapshot.skills, snapshot.skillGaps).skillMap;
 }
 
 function getWeeklyProgress(snapshot: StorageSnapshot): ProgressMetric[] {
@@ -749,7 +742,8 @@ export function assembleDashboardPayload(
   const battlePlan = getBattlePlan(snapshot);
   const behavioralBank = getBehavioralBank(snapshot);
   const behavioralSignals = getBehavioralSignals(snapshot);
-  const skillMap = getSkillMap(snapshot);
+  const skillInsights = buildSkillInsights(snapshot.skills, snapshot.skillGaps);
+  const skillMap = skillInsights.skillMap;
   const weeklyProgress = getWeeklyProgress(snapshot);
   const summaryMap = getSummaryRowMap(snapshot.summaryRows);
 
@@ -775,6 +769,7 @@ export function assembleDashboardPayload(
     behavioralBank,
     behavioralSignals,
     skillMap,
+    skillDomains: skillInsights.skillDomains,
     codingTracker: snapshot.tasks.filter((task) =>
       ["coding", "technical", "algorithm"].some((keyword) =>
         task.category.toLowerCase().includes(keyword)
@@ -782,7 +777,7 @@ export function assembleDashboardPayload(
     ),
     resources: getResources(snapshot),
     pastItems: getPastItems(snapshot),
-    weakestArea: skillMap.sort((left, right) => left.progressPercent - right.progressPercent)[0]?.skill || "Unknown",
+    weakestArea: skillInsights.weakestArea,
     configStatus: configStatus ?? {
       healthy: true,
       label: "Config healthy",

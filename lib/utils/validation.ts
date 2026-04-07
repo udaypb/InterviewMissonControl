@@ -120,12 +120,18 @@ export const resourceRowSchema = z.object({
 }) as z.ZodType<ResourceRow>;
 
 export const skillRowSchema = z.object({
+  skill_id: stringField,
   skill: stringField,
   category: stringField,
+  domain: stringField,
+  parent_skill: stringField,
+  item_type: stringField,
+  is_checked: stringField,
   progress_percent: stringField,
   target_percent: stringField,
   notes: stringField,
-  last_updated: stringField
+  last_updated: stringField,
+  sort_order: stringField
 }) as z.ZodType<SkillRow>;
 
 export const skillGapRowSchema = z.object({

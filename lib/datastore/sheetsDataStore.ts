@@ -8,6 +8,7 @@ import type {
   InterviewRow,
   InterviewsPayload,
   RoundRow,
+  SkillUpdateResult,
   SkillsPayload,
   StorageSnapshot,
   SyncResult,
@@ -15,8 +16,9 @@ import type {
   TasksPayload
 } from "@/lib/datastore/types";
 import { assembleDashboardPayload, buildSummaryRows } from "@/lib/datastore/dashboardAssembler";
+import { applySkillCheck, buildSkillInsights } from "@/lib/datastore/skillTree";
 import { ensureDriveWorkspaceStructure, getDriveWorkspaceStatus } from "@/lib/google/drive";
-import { appendSyncLogRow, ensureSpreadsheetStructure, readSheets, writeDashboardSummaryRows } from "@/lib/google/sheets";
+import { appendSyncLogRow, ensureSpreadsheetStructure, readSheets, writeDashboardSummaryRows, writeSkillsRows } from "@/lib/google/sheets";
 import { getOrSetCache, invalidateCache } from "@/lib/utils/cache";
 import { logError } from "@/lib/utils/logging";
 import {
@@ -140,6 +142,7 @@ export function buildFallbackDashboardPayload(message: string): DashboardPayload
     behavioralBank: [],
     behavioralSignals: [],
     skillMap: [],
+    skillDomains: [],
     codingTracker: [],
     resources: [],
     pastItems: [],
@@ -298,13 +301,33 @@ export class SheetsDataStore implements DataStore {
   async getSkills(): Promise<SkillsPayload> {
     return getOrSetCache("skills", dashboardConfig.cacheTtlMs, async () => {
       const snapshot = await getCachedSnapshot();
-      const dashboard = assembleDashboardPayload(snapshot, await getSystemConfigurationStatus());
+      const skillInsights = buildSkillInsights(snapshot.skills, snapshot.skillGaps);
       return {
-        skills: dashboard.skillMap,
+        skills: skillInsights.skillMap,
+        skillDomains: skillInsights.skillDomains,
         skillGaps: snapshot.skillGaps,
-        weakestArea: dashboard.weakestArea
+        weakestArea: skillInsights.weakestArea
       };
     });
+  }
+
+  async updateSkillCheck(skillId: string, checked: boolean): Promise<SkillUpdateResult> {
+    await ensureSpreadsheetStructure();
+    const snapshot = await readSnapshot();
+    const nextSkills = applySkillCheck(snapshot.skills, skillId, checked);
+    const nextSnapshot: StorageSnapshot = {
+      ...snapshot,
+      skills: nextSkills
+    };
+
+    await writeSkillsRows(nextSkills);
+    invalidateCache("storage-snapshot");
+    invalidateCache("dashboard-summary");
+    invalidateCache("skills");
+
+    return {
+      dashboard: assembleDashboardPayload(nextSnapshot, await getSystemConfigurationStatus())
+    };
   }
 
   async syncDashboard(): Promise<SyncResult> {
