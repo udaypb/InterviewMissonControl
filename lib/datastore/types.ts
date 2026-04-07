@@ -94,6 +94,7 @@ export interface ResourceRow {
   company: string;
   url: string;
   status: string;
+  purpose: string;
   notes: string;
 }
 
@@ -266,6 +267,7 @@ export interface ResourceItem {
   category: string;
   company: string;
   status: string;
+  purpose: string;
   notes: string;
   url: string;
 }

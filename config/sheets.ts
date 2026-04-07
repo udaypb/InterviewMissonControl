@@ -78,6 +78,7 @@ export const sheetDefinitions = {
     "company",
     "url",
     "status",
+    "purpose",
     "notes"
   ],
   skills: [
@@ -329,6 +330,7 @@ export const sheetSamples: {
       company: "Stripe",
       url: "https://example.com/stripe-stories",
       status: "active",
+      purpose: "Reliability, incident response, and judgment prep",
       notes: "Use for reliability, incident response, and judgment prep."
     },
     {
@@ -338,6 +340,7 @@ export const sheetSamples: {
       company: "Anthropic",
       url: "https://example.com/anthropic-notes",
       status: "active",
+      purpose: "Company and product prep",
       notes: "Review before product and AI safety conversations."
     }
   ],

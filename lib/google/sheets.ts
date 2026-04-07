@@ -102,9 +102,9 @@ const readHeaderAliases: Partial<Record<SheetName, Record<string, string[]>>> = 
     notes: ["notes", "next_step"]
   },
   rounds: {
-    round_name: ["round_name", "round", "stage", "event_type", "status"],
+    round_name: ["round_name", "round_type", "round", "stage", "event_type", "status"],
     date: ["date", "event_date"],
-    time: ["time", "start_time", "start"],
+    time: ["time", "event_time", "start_time", "start"],
     status: ["status", "stage"],
     priority: ["priority"],
     next_step: ["next_step"],
@@ -152,7 +152,8 @@ const readHeaderAliases: Partial<Record<SheetName, Record<string, string[]>>> = 
     company: ["company"],
     url: ["url", "link"],
     status: ["status"],
-    notes: ["notes", "description"]
+    purpose: ["purpose", "description"],
+    notes: ["notes", "usage_notes"]
   },
   skills: {
     progress_percent: ["progress_percent", "level"],
@@ -249,6 +250,7 @@ function canonicalizeRow(
   if (sheetName === "resources") {
     canonicalRow.resource_id = canonicalRow.resource_id || `resource-${slugify(canonicalRow.title, String(rowIndex + 1))}`;
     canonicalRow.status = canonicalRow.status || "active";
+    canonicalRow.notes = canonicalRow.notes || canonicalRow.purpose;
   }
 
   if (sheetName === "companies") {

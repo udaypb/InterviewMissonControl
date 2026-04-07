@@ -443,14 +443,15 @@ function DashboardContent({
               <div>
                 <p className="text-sm font-medium">{resource.title}</p>
                 <p className="mt-1 text-xs uppercase tracking-[0.22em] text-muted">
-                  {resource.category} · {resource.company}
+                  {resource.company === "General" ? resource.category : `${resource.category} · ${resource.company}`}
                 </p>
               </div>
               <span className="rounded-full border border-border/70 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-muted">
                 {resource.status}
               </span>
             </div>
-            <p className="mt-3 text-sm leading-6 text-muted">{resource.notes}</p>
+            <p className="mt-3 text-sm leading-6 text-text">{resource.purpose}</p>
+            <p className="mt-2 text-sm leading-6 text-muted">{resource.notes}</p>
             {resource.url ? (
               <a
                 href={resource.url}

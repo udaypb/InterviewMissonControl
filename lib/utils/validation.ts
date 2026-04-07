@@ -115,6 +115,7 @@ export const resourceRowSchema = z.object({
   company: stringField,
   url: stringField,
   status: stringField,
+  purpose: stringField,
   notes: stringField
 }) as z.ZodType<ResourceRow>;
 

@@ -356,6 +356,19 @@ function splitList(value: string) {
     .filter(Boolean);
 }
 
+function normalizeStoryStrength(value: string) {
+  const numeric = Number.parseFloat(value);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+
+  if (numeric <= 10) {
+    return clampPercent(numeric * 10);
+  }
+
+  return clampPercent(numeric);
+}
+
 function getBehavioralStatusRank(status: string) {
   switch (status.trim().toLowerCase()) {
     case "strong":
@@ -394,7 +407,7 @@ function getBehavioralBank(snapshot: StorageSnapshot): BehavioralStoryCard[] {
         notes: row.notes
       }))
     : snapshot.behavioralStories.map((row) => {
-        const percent = clampPercent(row.strength_score);
+        const percent = normalizeStoryStrength(row.strength_score);
         const storySections = [
           row.situation ? `Situation: ${row.situation}` : "",
           row.task ? `Task: ${row.task}` : "",
@@ -670,6 +683,7 @@ function getResources(snapshot: StorageSnapshot) {
       category: compactText(resource.category, "General"),
       company: compactText(resource.company, "General"),
       status: compactText(resource.status, "active"),
+      purpose: compactText(resource.purpose, resource.notes || "No purpose logged."),
       notes: compactText(resource.notes, "No notes logged."),
       url: resource.url
     }));
