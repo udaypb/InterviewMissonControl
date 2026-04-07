@@ -101,8 +101,11 @@ export interface ResourceRow {
 export interface SkillRow {
   skill_id: string;
   skill: string;
+  level: string;
   category: string;
   domain: string;
+  subcategory: string;
+  topic: string;
   parent_skill: string;
   item_type: string;
   is_checked: string;

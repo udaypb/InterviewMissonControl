@@ -76,6 +76,20 @@ function inferDomainFromLabel(label: string) {
 }
 
 function normalizeItemType(row: SkillRow) {
+  const normalizedLevel = row.level.trim().toUpperCase();
+
+  if (normalizedLevel === "CATEGORY") {
+    return "domain";
+  }
+
+  if (normalizedLevel === "SUBCATEGORY") {
+    return "group";
+  }
+
+  if (normalizedLevel === "TOPIC") {
+    return "item";
+  }
+
   const normalized = row.item_type.trim().toLowerCase();
 
   if (normalized === "domain" || normalized === "group" || normalized === "item") {
@@ -119,19 +133,35 @@ function normalizeSkillRows(skills: SkillRow[], skillGaps: SkillGapRow[]) {
   );
 
   const nodes = skills.map<NormalizedSkillNode>((row, index) => {
-    const label = row.skill.trim() || row.domain.trim() || row.category.trim() || `Skill ${index + 1}`;
     const itemType = normalizeItemType(row);
-    const domain = row.domain.trim() || (itemType === "domain" ? label : row.category.trim() || inferDomainFromLabel(label));
-    const progressPercent = clampPercent(row.progress_percent || (isTruthy(row.is_checked) ? "100" : "0"));
+    const label =
+      itemType === "domain"
+        ? row.category.trim() || row.domain.trim() || row.skill.trim() || `Skill ${index + 1}`
+        : itemType === "group"
+          ? row.subcategory.trim() || row.skill.trim() || `Skill ${index + 1}`
+          : row.topic.trim() || row.skill.trim() || `Skill ${index + 1}`;
+    const domain = row.category.trim() || row.domain.trim() || (itemType === "domain" ? label : inferDomainFromLabel(label));
+    const checked =
+      itemType === "item"
+        ? isTruthy(row.is_checked) || clampPercent(row.progress_percent) >= 100
+        : false;
+    const progressPercent =
+      itemType === "item" && (row.level.trim().toUpperCase() === "TOPIC" || row.topic.trim())
+        ? checked
+          ? 100
+          : clampPercent(row.progress_percent || "0")
+        : clampPercent(row.progress_percent || (isTruthy(row.is_checked) ? "100" : "0"));
     const targetPercent = clampPercent(row.target_percent || "100");
 
     return {
       id: row.skill_id.trim() || slugify(`${domain}-${row.parent_skill}-${label}-${index + 1}`, `skill-${index + 1}`),
       label,
       domain,
-      parentRef: row.parent_skill.trim(),
+      parentRef:
+        row.parent_skill.trim() ||
+        (itemType === "group" ? domain : itemType === "item" ? row.subcategory.trim() || domain : ""),
       itemType,
-      checked: isTruthy(row.is_checked) || progressPercent >= 100,
+      checked,
       progressPercent,
       targetPercent,
       notes: row.notes.trim(),
@@ -175,8 +205,11 @@ function normalizeSkillRows(skills: SkillRow[], skillGaps: SkillGapRow[]) {
       source: {
         skill_id: "",
         skill: node.domain,
+        level: "CATEGORY",
         category: node.domain,
         domain: node.domain,
+        subcategory: "",
+        topic: "",
         parent_skill: "",
         item_type: "domain",
         is_checked: "",
@@ -405,7 +438,21 @@ export function applySkillCheck(skills: SkillRow[], skillId: string, checked: bo
       ...node.source,
       skill_id: node.id,
       skill: node.label,
+      level:
+        node.itemType === "domain"
+          ? "CATEGORY"
+          : node.itemType === "group"
+            ? "SUBCATEGORY"
+            : "TOPIC",
+      category: node.domain,
       domain: node.domain,
+      subcategory:
+        node.itemType === "group"
+          ? node.label
+          : node.itemType === "item"
+            ? node.source.subcategory || node.parentRef
+            : "",
+      topic: node.itemType === "item" ? node.label : "",
       item_type: node.itemType,
       is_checked: node.itemType === "item" && node.children.length === 0 ? (node.checked ? "TRUE" : "FALSE") : node.source.is_checked,
       sort_order: String(node.sortOrder)

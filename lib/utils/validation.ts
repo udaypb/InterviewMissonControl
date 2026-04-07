@@ -122,8 +122,11 @@ export const resourceRowSchema = z.object({
 export const skillRowSchema = z.object({
   skill_id: stringField,
   skill: stringField,
+  level: stringField,
   category: stringField,
   domain: stringField,
+  subcategory: stringField,
+  topic: stringField,
   parent_skill: stringField,
   item_type: stringField,
   is_checked: stringField,

@@ -90,6 +90,16 @@ function normalizePercentLikeValue(value: string) {
   }
 }
 
+function clampPercentLikeCheckbox(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (["100", "true", "yes", "1", "checked", "done"].includes(normalized)) {
+    return "TRUE";
+  }
+
+  return "FALSE";
+}
+
 const readHeaderAliases: Partial<Record<SheetName, Record<string, string[]>>> = {
   interviews: {
     date: ["date", "event_date"],
@@ -157,13 +167,17 @@ const readHeaderAliases: Partial<Record<SheetName, Record<string, string[]>>> = 
   },
   skills: {
     skill_id: ["skill_id", "id"],
-    progress_percent: ["progress_percent", "level"],
+    skill: ["skill", "name"],
+    level: ["level", "row_level"],
+    domain: ["domain", "category", "top_level_domain", "pillar"],
+    subcategory: ["subcategory", "group", "sub_category"],
+    topic: ["topic", "skill", "item"],
+    progress_percent: ["progress_percent", "progress", "checked_value", "completion", "0"],
+    is_checked: ["is_checked", "checked", "done", "complete", "completed", "progress", "0"],
     notes: ["notes", "risk"],
-    category: ["category", "focus_area"],
-    domain: ["domain", "top_level_domain", "pillar"],
+    category: ["skill_category", "focus_area"],
     parent_skill: ["parent_skill", "parent", "parent_id"],
     item_type: ["item_type", "row_type", "type"],
-    is_checked: ["is_checked", "checked", "done"],
     target_percent: ["target_percent", "target"],
     last_updated: ["last_updated", "updated_at"],
     sort_order: ["sort_order", "order", "position"]
@@ -265,6 +279,7 @@ function canonicalizeRow(
   }
 
   if (sheetName === "skills") {
+    const rawLevel = canonicalRow.level.trim().toUpperCase();
     const normalizedType = canonicalRow.item_type.trim().toLowerCase();
     const explicitType =
       normalizedType === "domain" || normalizedType === "group" || normalizedType === "item"
@@ -273,19 +288,51 @@ function canonicalizeRow(
           ? "item"
           : "";
 
-    canonicalRow.skill = canonicalRow.skill || canonicalRow.domain || canonicalRow.category || `Skill ${rowIndex + 1}`;
-    canonicalRow.category = canonicalRow.category || inferSkillCategory(canonicalRow.skill);
-    canonicalRow.domain =
-      canonicalRow.domain ||
-      (!canonicalRow.parent_skill && explicitType !== "item" ? canonicalRow.skill : canonicalRow.category || inferSkillCategory(canonicalRow.skill));
-    canonicalRow.item_type =
-      explicitType ||
-      (canonicalRow.parent_skill
-        ? "item"
-        : canonicalRow.domain && normalizeHeader(canonicalRow.domain) !== normalizeHeader(canonicalRow.skill)
+    if (rawLevel === "CATEGORY") {
+      canonicalRow.skill = canonicalRow.category || canonicalRow.domain || canonicalRow.skill || `Skill ${rowIndex + 1}`;
+      canonicalRow.domain = canonicalRow.category || canonicalRow.domain || canonicalRow.skill;
+      canonicalRow.subcategory = "";
+      canonicalRow.topic = "";
+      canonicalRow.parent_skill = "";
+      canonicalRow.item_type = explicitType || "domain";
+    } else if (rawLevel === "SUBCATEGORY") {
+      canonicalRow.skill = canonicalRow.subcategory || canonicalRow.skill || `Skill ${rowIndex + 1}`;
+      canonicalRow.domain = canonicalRow.category || canonicalRow.domain || inferSkillCategory(canonicalRow.skill);
+      canonicalRow.parent_skill = canonicalRow.category || canonicalRow.parent_skill;
+      canonicalRow.topic = "";
+      canonicalRow.item_type = explicitType || "group";
+    } else if (rawLevel === "TOPIC") {
+      canonicalRow.skill = canonicalRow.topic || canonicalRow.skill || `Skill ${rowIndex + 1}`;
+      canonicalRow.domain = canonicalRow.category || canonicalRow.domain || inferSkillCategory(canonicalRow.skill);
+      canonicalRow.parent_skill = canonicalRow.subcategory || canonicalRow.category || canonicalRow.parent_skill;
+      canonicalRow.item_type = explicitType || "item";
+    } else {
+      canonicalRow.skill = canonicalRow.skill || canonicalRow.topic || canonicalRow.subcategory || canonicalRow.domain || canonicalRow.category || `Skill ${rowIndex + 1}`;
+      canonicalRow.category = canonicalRow.category || inferSkillCategory(canonicalRow.skill);
+      canonicalRow.domain =
+        canonicalRow.domain ||
+        (!canonicalRow.parent_skill && explicitType !== "item" ? canonicalRow.skill : canonicalRow.category || inferSkillCategory(canonicalRow.skill));
+      canonicalRow.item_type =
+        explicitType ||
+        (canonicalRow.parent_skill
           ? "item"
-          : "domain");
+          : canonicalRow.domain && normalizeHeader(canonicalRow.domain) !== normalizeHeader(canonicalRow.skill)
+            ? "item"
+            : "domain");
+      canonicalRow.level =
+        canonicalRow.level ||
+        (canonicalRow.item_type === "domain" ? "CATEGORY" : canonicalRow.item_type === "group" ? "SUBCATEGORY" : "TOPIC");
+    }
+
+    canonicalRow.category = canonicalRow.category || canonicalRow.domain || inferSkillCategory(canonicalRow.skill);
     canonicalRow.is_checked = canonicalRow.is_checked || "";
+    const normalizedCheck = canonicalRow.is_checked.trim().toLowerCase();
+    if (["true", "yes", "1", "y", "checked", "done"].includes(normalizedCheck)) {
+      canonicalRow.progress_percent = "100";
+    }
+    if (["false", "no", "0", "n", "unchecked", ""].includes(normalizedCheck) && !canonicalRow.progress_percent) {
+      canonicalRow.progress_percent = "0";
+    }
     canonicalRow.progress_percent = normalizePercentLikeValue(
       canonicalRow.progress_percent || (canonicalRow.is_checked ? "100" : "0")
     );
@@ -297,6 +344,9 @@ function canonicalizeRow(
         `skill-${rowIndex + 1}`
       );
     canonicalRow.sort_order = canonicalRow.sort_order || String(rowIndex + 1);
+    if (!canonicalRow.is_checked && canonicalRow.item_type === "item") {
+      canonicalRow.is_checked = clampPercentLikeCheckbox(canonicalRow.progress_percent);
+    }
   }
 
   if (sheetName === "behavioral_bank") {
