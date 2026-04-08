@@ -10,6 +10,7 @@ This project is designed for Vercel.
 - `GOOGLE_PRIVATE_KEY`
 - `GOOGLE_SHEETS_SPREADSHEET_ID`
 - `GOOGLE_DRIVE_PROJECT_FOLDER_ID`
+- `GOOGLE_DOC_KNOWLEDGE_GRAPH_ID` (optional)
 - `NEXT_PUBLIC_APP_NAME`
 
 ## Google Setup
@@ -18,6 +19,7 @@ You need one Google Cloud project with:
 
 - Google Sheets API enabled
 - Google Drive API enabled
+- Google Docs API enabled
 - one service account for server-side access
 
 ### Sheets
@@ -43,6 +45,13 @@ You need one Google Cloud project with:
    - `backups`
 
 This Drive folder is for ChatGPT working memory and raw context. The dashboard still renders from Sheets only.
+
+### Optional Knowledge Graph Google Doc
+
+1. Enable the Google Docs API in the same Google Cloud project.
+2. Share the knowledge-graph Google Doc with the same service account used by the app.
+3. Put the document ID into `GOOGLE_DOC_KNOWLEDGE_GRAPH_ID`.
+4. The Skills tab will read table-based nodes, edges, and domain legend rows directly from that document.
 
 ## Vercel Environment Variable Notes
 

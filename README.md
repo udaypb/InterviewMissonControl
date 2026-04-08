@@ -45,6 +45,7 @@ Dashboard frontend
    - `GOOGLE_PRIVATE_KEY`
    - `GOOGLE_SHEETS_SPREADSHEET_ID`
    - `GOOGLE_DRIVE_PROJECT_FOLDER_ID`
+   - `GOOGLE_DOC_KNOWLEDGE_GRAPH_ID` (optional, enables the Skills knowledge graph)
    - `NEXT_PUBLIC_APP_NAME`
 
 4. Start the app:
@@ -89,6 +90,7 @@ The final design uses a dedicated Google Drive folder as raw context for ChatGPT
 - `GET /api/tasks`
 - `GET /api/companies`
 - `GET /api/skills`
+- `GET /api/skills/knowledge-graph`
 - `POST /api/sync`
 
 ## Sync Behavior

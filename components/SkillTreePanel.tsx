@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 
+import { SkillKnowledgeGraph } from "@/components/SkillKnowledgeGraph";
 import type { DashboardPayload, SkillDomain, SkillTreeNode, SkillUpdateResult } from "@/lib/datastore/types";
 
 interface SkillTreePanelProps {
@@ -259,6 +260,8 @@ export function SkillTreePanel({ domains, weakestArea, onDashboardUpdate }: Skil
           );
         })}
       </div>
+
+      <SkillKnowledgeGraph />
 
       {error ? (
         <div className="mt-5 rounded-[22px] border border-[#a35f53]/40 bg-[#241513] px-4 py-3 text-sm text-[#efb7a9]">

@@ -31,6 +31,7 @@ export const envSchema = z.object({
   GOOGLE_PRIVATE_KEY: requiredEnvString,
   GOOGLE_SHEETS_SPREADSHEET_ID: requiredEnvString,
   GOOGLE_DRIVE_PROJECT_FOLDER_ID: stringField.optional(),
+  GOOGLE_DOC_KNOWLEDGE_GRAPH_ID: stringField.optional(),
   NEXT_PUBLIC_APP_NAME: stringField.optional()
 });
 

@@ -297,6 +297,45 @@ export interface SkillDomain {
   children: SkillTreeNode[];
 }
 
+export interface KnowledgeGraphNode {
+  id: string;
+  label: string;
+  domain: string;
+  subdomain: string;
+  strength: number;
+  proficiency: string;
+  description: string;
+  sphereSize: number;
+  colorHex: string;
+}
+
+export interface KnowledgeGraphLink {
+  source: string;
+  target: string;
+  relationship: string;
+  weight: number;
+  edgeType: string;
+  justification: string;
+}
+
+export interface KnowledgeGraphDomainLegend {
+  id: string;
+  domain: string;
+  colorFamily: string;
+  positionHint: string;
+  notes: string;
+}
+
+export interface KnowledgeGraphPayload {
+  available: boolean;
+  title: string;
+  lastUpdated: string;
+  nodes: KnowledgeGraphNode[];
+  links: KnowledgeGraphLink[];
+  domains: KnowledgeGraphDomainLegend[];
+  message: string;
+}
+
 export interface ResourceItem {
   id: string;
   title: string;

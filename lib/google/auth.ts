@@ -4,6 +4,7 @@ import { getValidatedEnv } from "@/lib/utils/validation";
 
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
+const DOCS_SCOPE = "https://www.googleapis.com/auth/documents.readonly";
 
 function formatPrivateKey(privateKey: string) {
   let normalized = privateKey.trim();
@@ -56,4 +57,8 @@ export function getSheetsAuth() {
 
 export function getDriveAuth() {
   return createGoogleJwt([DRIVE_SCOPE]);
+}
+
+export function getDocsAuth() {
+  return createGoogleJwt([DOCS_SCOPE]);
 }
